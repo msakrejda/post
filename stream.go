@@ -28,6 +28,11 @@ func NewStream(inner BufferedStreamer) *Stream {
 	return &s
 }
 
+func (s *Stream) WriteByte(val byte) (n int, err error) {
+	s.buf1[0] = val
+	return s.str.Write(s.buf1)
+}
+
 func (s *Stream) WriteInt16(val int16) (n int, err error) {
 	be.PutUint16(s.buf2, uint16(val))
 	return s.str.Write(s.buf2)
@@ -36,11 +41,6 @@ func (s *Stream) WriteInt16(val int16) (n int, err error) {
 func (s *Stream) WriteInt32(val int32) (n int, err error) {
 	be.PutUint32(s.buf4, uint32(val))
 	return s.str.Write(s.buf4)
-}
-
-func (s *Stream) WriteByte(val byte) (n int, err error) {
-	s.buf1[0] = val
-	return s.str.Write(s.buf1)
 }
 
 func (s *Stream) WriteCString(val string) (n int, err error) {
