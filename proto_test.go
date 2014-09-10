@@ -53,3 +53,11 @@ func TextNext(t *testing.T) {
 		t.Errorf("want 'x'; got %v", val)
 	}
 }
+
+func TextNextError(t *testing.T) {
+	s := newProtoStream([]byte{})
+	_, err := s.Next()
+	if err == nil {
+		t.Error("want err; got nil")
+	}
+}
