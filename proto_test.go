@@ -19,7 +19,18 @@ func TestExpectExpected(t *testing.T) {
 		}
 	}()
 	s := newProtoStream([]byte{'x'})
-	s.Expect('x')
+	err := s.Expect('x')
+	if err != nil {
+		t.Errorf("want nil error; got %v", err)
+	}
+}
+
+func TextExpectError(t *testing.T) {
+	s := newProtoStream([]byte{})
+	err := s.Expect('x')
+	if err == nil {
+		t.Error("want error; got nil")
+	}
 }
 
 func TestExpectUnexpected(t *testing.T) {
