@@ -18,7 +18,6 @@ func (p *ProtoStream) Next() (msgType byte, err error) {
 	return p.next, nil
 }
 
-
 // Read the next message type from the stream. Panic if it's not the
 // expected message type.
 func (p *ProtoStream) Expect(expected byte) (err error) {
@@ -33,3 +32,31 @@ func (p *ProtoStream) Expect(expected byte) (err error) {
 	return nil
 }
 
+func (p *ProtoStream) SendStartupMessage(params map[string]string) (err error) {
+	var msgSize int32 = 4 /* size itself */ + 4 /* protocol header */
+	for key, val := range params {
+		msgSize += int32(len(key)) + 1 + int32(len(val)) + 1
+	}
+	msgSize += 1 // the trailing zero byte
+	_, err = p.str.WriteInt32(msgSize)
+	if err != nil {
+		return err
+	}
+	// the protocol version number
+	_, err = p.str.WriteInt32(196608)
+	if err != nil {
+		return err
+	}
+	for key, val := range params {
+		_, err = p.str.WriteCString(key)
+		if err != nil {
+			return err
+		}
+		_, err = p.str.WriteCString(val)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = p.str.WriteByte(0)
+	return err
+}
