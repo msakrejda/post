@@ -61,6 +61,15 @@ func (p *ProtoStream) SendStartupMessage(params map[string]string) (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendSSLRequest() (err error) {
+	_, err = p.str.WriteInt32(8)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(80877103)
+	return err
+}
+
 func (p *ProtoStream) SendTerminate() (err error) {
 	_, err = p.str.WriteByte('X')
 	if err != nil {

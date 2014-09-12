@@ -90,6 +90,20 @@ func TestSendStartupMessage(t *testing.T) {
 	}
 }
 
+func TestSendSSLRequest(t *testing.T) {
+	s, buf := newProtoStream()
+	err := s.SendSSLRequest()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	expected := []byte{0x0, 0x0, 0x0, 0x8, 0x4, 0xd2, 0x16, 0x2f}
+	written := buf.Bytes()
+	if !bytes.Equal(expected, written) {
+		t.Errorf("want %#v; got %#v", expected, written)
+	}
+}
+
+
 func TestSendTerminate(t *testing.T) {
 	s, buf := newProtoStream()
 	err := s.SendTerminate()
