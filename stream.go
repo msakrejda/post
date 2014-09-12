@@ -53,6 +53,10 @@ func (s *Stream) WriteCString(val string) (n int, err error) {
 	return s.str.Write(s.buf1)
 }
 
+func (s *Stream) Write(val []byte) (n int, err error) {
+	return s.str.Write(val)
+}
+
 func (s *Stream) ReadByte() (b byte, err error) {
 	_, err = s.str.Read(s.buf1)
 	if err != nil {
@@ -98,4 +102,8 @@ func (s *Stream) ReadCString() (val string, err error) {
 			buf.Write(s.buf1)
 		}
 	}
+}
+
+func (s *Stream) Read(buf []byte) (n int, err error) {
+	return s.str.Read(buf)
 }

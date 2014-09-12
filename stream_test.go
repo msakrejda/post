@@ -60,6 +60,15 @@ var cStringTests = []struct{
 	{ "déjà vu", []byte{0x64, 0xc3, 0xa9, 0x6a, 0xc3, 0xa0, 0x20, 0x76, 0x75, 0x0} },
 }
 
+var bytesTests = []struct{
+	value []byte
+	bytes []byte
+}{
+	{ []byte{}, []byte{} },
+	{ []byte{0x1}, []byte{0x1} },
+	{ []byte{0x1, 0x2}, []byte{0x1, 0x2} },
+}
+
 func TestWriteByte(t *testing.T) {
 	for i, tt := range byteTests {
 		var b FakeBufferedStreamer
@@ -104,6 +113,18 @@ func TestWriteCString(t *testing.T) {
 		var b FakeBufferedStreamer
 		s := NewStream(&b)
 		s.WriteCString(tt.value)
+		result := b.Bytes()
+		if !bytes.Equal(tt.bytes, result) {
+			t.Errorf("%d: want %#v; got %#v", i, tt.bytes, result)
+		}
+	}
+}
+
+func TestWrite(t *testing.T) {
+	for i, tt := range bytesTests {
+		var b FakeBufferedStreamer
+		s := NewStream(&b)
+		s.Write(tt.value)
 		result := b.Bytes()
 		if !bytes.Equal(tt.bytes, result) {
 			t.Errorf("%d: want %#v; got %#v", i, tt.bytes, result)
@@ -167,6 +188,25 @@ func TestReadCString(t *testing.T) {
 		}
 		if result != tt.value {
 			t.Errorf("%d: want %#v; got %#v", i, tt.value, result)
+		}
+	}
+}
+
+func TestRead(t *testing.T) {
+	for i, tt := range bytesTests {
+		buf := bytes.NewBuffer(tt.bytes)
+		b := FakeBufferedStreamer{*buf}
+		s := NewStream(&b)
+		result := make([]byte, len(tt.bytes))
+		n, err := s.Read(result)
+		if err != nil {
+			t.Errorf("%d: want nil error; got %v", err)
+		}
+		if n != len(tt.bytes) {
+			t.Errorf("%d: want %#v bytes read; got %#v", i, len(tt.bytes), n)
+		}
+		if !bytes.Equal(tt.bytes, result) {
+			t.Errorf("%d: want %#v; got %#v", i, tt.bytes, result)
 		}
 	}
 }
