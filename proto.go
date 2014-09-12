@@ -60,3 +60,12 @@ func (p *ProtoStream) SendStartupMessage(params map[string]string) (err error) {
 	_, err = p.str.WriteByte(0)
 	return err
 }
+
+func (p *ProtoStream) SendTerminate() (err error) {
+	_, err = p.str.WriteByte('X')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4) // message size
+	return err
+}
