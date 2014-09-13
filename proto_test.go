@@ -166,3 +166,11 @@ func TestReceiveBackendKeyData(t *testing.T) {
 		t.Errorf("want secret 0x03040506; got %x", keyData.SecretKey)
 	}
 }
+
+func TestReceiveBind(t *testing.T) {
+	s := newProtoStreamContent([]byte{0x0, 0x0, 0x0, 0x4})
+	err := s.ReceiveBindComplete()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+}

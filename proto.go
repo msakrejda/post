@@ -140,3 +140,14 @@ func (p *ProtoStream) ReceiveBackendKeyData() (keyData *BackendKeyData, err erro
 	}
 	return &BackendKeyData{pid, key}, nil
 }
+
+func (p *ProtoStream) ReceiveBindComplete() (err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return err
+	}
+	if size != 4 {
+		return fmt.Errorf("post: expected 4 byte BindComplete; got %v", size)
+	}
+	return nil
+}
