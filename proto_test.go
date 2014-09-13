@@ -261,7 +261,7 @@ func TestReceiveBackendKeyData(t *testing.T) {
 	}
 }
 
-func TestReceiveBind(t *testing.T) {
+func TestReceiveBindComplete(t *testing.T) {
 	s := newProtoStreamContent([]byte{0x0, 0x0, 0x0, 0x4})
 	err := s.ReceiveBindComplete()
 	if err != nil {
