@@ -180,6 +180,41 @@ func TestSendBind(t *testing.T) {
 	}
 }
 
+var cancelTests = []struct{
+	pid int32
+	secretKey int32
+	msgBytes []byte
+}{
+	{0x1, 0x2, []byte{
+		0x0, 0x0, 0x0, 0x10,   // length
+		0x4, 0xd2, 0x16, 0x2e, // CancelRequest code
+		0x0, 0x0, 0x0, 0x1,    // pid
+		0x0, 0x0, 0x0, 0x2,    // secret key
+	        },
+	},
+	{0xFFFF, 0x77777777, []byte{
+		0x0, 0x0, 0x0, 0x10,     // length
+		0x4, 0xd2, 0x16, 0x2e,   // CancelRequest code
+		0x0, 0x0, 0xFF, 0xFF,    // pid
+		0x77, 0x77, 0x77, 0x77,  // secret key
+	        },
+	},
+}
+
+func TestSendCancelRequest(t *testing.T) {
+	for i, tt := range cancelTests {
+		s, buf := newProtoStream()
+		err := s.SendCancelRequest(tt.pid, tt.secretKey)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		written := buf.Bytes()
+		if !bytes.Equal(tt.msgBytes, written) {
+			t.Errorf("want\n\t%#v;\ngot\n\t%#v", tt.msgBytes, written)
+		}
+	}
+}
+
 var authRecvTests = []struct{
 	authType AuthResponseType
 	payload []byte

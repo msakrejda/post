@@ -161,6 +161,23 @@ func (p *ProtoStream) SendBind(portal string, statement string,
 	return nil
 }
 
+func (p *ProtoStream) SendCancelRequest(pid, secretKey int32) (err error) {
+	_, err = p.str.WriteInt32(16)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(80877102)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(pid)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(secretKey)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
