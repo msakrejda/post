@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func compareBytes(t *testing.T, expected, actual []byte) {
+	if !bytes.Equal(expected, actual) {
+		t.Errorf("want\n\t%#v;\ngot\n\t%#v", expected, actual)
+	}
+}
+
+func compareBytesN(n int, t *testing.T, expected, actual []byte) {
+	if !bytes.Equal(expected, actual) {
+		t.Errorf("%d: want\n\t%#v;\ngot\n\t%#v", n, expected, actual)
+	}
+}
+
+
 func newProtoStream() (*ProtoStream, *bytes.Buffer) {
 	b := FakeBufferedStreamer{}
 	s := NewStream(&b)
@@ -83,10 +96,7 @@ func TestSendStartupMessage(t *testing.T) {
 		if err != nil {
 			t.Errorf("want nil err; got %v", err)
 		}
-		written := buf.Bytes()
-		if !bytes.Equal(tt.msgBytes, written) {
-			t.Errorf("%d: want %#v; got %#v", i, tt.msgBytes, written)
-		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
 
@@ -97,10 +107,7 @@ func TestSendSSLRequest(t *testing.T) {
 		t.Errorf("want nil err; got %v", err)
 	}
 	expected := []byte{0x0, 0x0, 0x0, 0x8, 0x4, 0xd2, 0x16, 0x2f}
-	written := buf.Bytes()
-	if !bytes.Equal(expected, written) {
-		t.Errorf("want %#v; got %#v", expected, written)
-	}
+	compareBytes(t, expected, buf.Bytes())
 }
 
 
@@ -110,11 +117,8 @@ func TestSendTerminate(t *testing.T) {
 	if err != nil {
 		t.Errorf("want nil err; got %v", err)
 	}
-	written := buf.Bytes()
 	expected := []byte{'X', 0x0, 0x0, 0x0, 0x4}
-	if !bytes.Equal(expected, written) {
-		t.Errorf("want %#v; got %#v", expected, written)
-	}
+	compareBytes(t, expected, buf.Bytes())
 }
 
 var bindTests = []struct{
@@ -173,10 +177,7 @@ func TestSendBind(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
-		written := buf.Bytes()
-		if !bytes.Equal(tt.msgBytes, written) {
-			t.Errorf("want %#v;\ngot %#v", tt.msgBytes, written)
-		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
 
@@ -208,10 +209,7 @@ func TestSendCancelRequest(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
-		written := buf.Bytes()
-		if !bytes.Equal(tt.msgBytes, written) {
-			t.Errorf("want\n\t%#v;\ngot\n\t%#v", tt.msgBytes, written)
-		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
 
@@ -243,9 +241,7 @@ func TestReceiveAuthResponse(t *testing.T) {
 			t.Errorf("%d: want auth response subtype %v; got %v",
 				i, tt.authType, authResp.Subtype)
 		}
-		if !bytes.Equal(authResp.Payload, tt.payload) {
-			t.Errorf("%d: want %#v; got %#v", i, tt.payload, authResp.Payload)
-		}
+		compareBytesN(i, t, tt.payload, authResp.Payload)
 	}
 }
 
