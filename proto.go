@@ -102,6 +102,65 @@ func (p *ProtoStream) SendTerminate() (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendBind(portal string, statement string,
+	formats []int16, params [][]byte, resultFormats []int16) (err error) {
+	_, err = p.str.WriteByte('B')
+	if err != nil {
+		return err
+	}
+	msgSize := 4 + (len(portal) + 1) + (len(statement) + 1) +
+		(2 + len(formats) * 2) +
+		2 + // param count; we account for actual params below
+		(2 + len(resultFormats) * 2)
+	for _, param := range params {
+		msgSize += 4 + len(param)
+	}
+	_, err = p.str.WriteInt32(int32(msgSize))
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(portal)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(statement)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt16(int16(len(formats)))
+	if err != nil {
+		return err
+	}
+	for _, fmt := range formats {
+		_, err = p.str.WriteInt16(fmt)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = p.str.WriteInt16(int16(len(params)))
+	for _, param := range params {
+		_, err = p.str.WriteInt32(int32(len(param)))
+		if err != nil {
+			return err
+		}
+		_, err := p.str.Write(param)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = p.str.WriteInt16(int16(len(resultFormats)))
+	if err != nil {
+		return err
+	}
+	for _, fmt := range resultFormats {
+		_, err = p.str.WriteInt16(fmt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {

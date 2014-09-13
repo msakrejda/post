@@ -117,6 +117,69 @@ func TestSendTerminate(t *testing.T) {
 	}
 }
 
+var bindTests = []struct{
+	portal string
+	statement string
+	formats []int16
+	params [][]byte
+	resultFormats []int16
+	msgBytes []byte
+}{
+	{"", "", []int16{}, [][]byte{}, []int16{},
+		[]byte{'B',
+			0x0, 0x0, 0x0, 0xc,
+			0x0, // portal
+			0x0, // statement
+			0x0, 0x0, // num formats
+			0x0, 0x0, // num params
+			0x0, 0x0, // num result formats
+		}, // the simplest Bind
+	},
+	{"foo", "bar", []int16{}, [][]byte{}, []int16{},
+		[]byte{'B',
+			0x0, 0x0, 0x0, 0x12,
+			'f', 'o', 'o', 0x0, // portal
+			'b', 'a', 'r', 0x0, // statement
+			0x0, 0x0, // num formats
+			0x0, 0x0, // num params
+			0x0, 0x0, // num result formats
+		},
+	},
+	{"", "", []int16{0x1, 0x0}, [][]byte{[]byte{0x2,0x3},[]byte{0x4,0x5}}, []int16{0x0, 0x1},
+		[]byte{'B',
+			0x0, 0x0, 0x0, 0x20,
+			0x0, // portal
+			0x0, // statement
+			0x0, 0x2, // num formats
+			0x0, 0x1, // format 1
+			0x0, 0x0, // format 2
+			0x0, 0x2, // num params
+			0x0, 0x0, 0x0, 0x2, // param 1 length
+			0x2, 0x3, // param 1 value
+			0x0, 0x0, 0x0, 0x2, // param 2 length
+			0x4, 0x5, // param 1 value
+			0x0, 0x2, // num result formats
+			0x0, 0x0, // format 1
+			0x0, 0x1, // format 2
+		}, // the simplest Bind
+	},
+}
+
+func TestSendBind(t *testing.T) {
+	for i, tt := range bindTests {
+		s, buf := newProtoStream()
+		err := s.SendBind(tt.portal, tt.statement,
+			tt.formats, tt.params, tt.resultFormats)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		written := buf.Bytes()
+		if !bytes.Equal(tt.msgBytes, written) {
+			t.Errorf("want %#v;\ngot %#v", tt.msgBytes, written)
+		}
+	}
+}
+
 var authRecvTests = []struct{
 	authType AuthResponseType
 	payload []byte
@@ -174,3 +237,4 @@ func TestReceiveBind(t *testing.T) {
 		t.Errorf("want nil err; got %v", err)
 	}
 }
+
