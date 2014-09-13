@@ -4,6 +4,24 @@ import (
 	"fmt"
 )
 
+type AuthResponseType int32
+
+const (
+	AuthenticationOk AuthResponseType = 0
+	AuthenticationKerberosV5 AuthResponseType = 2
+	AuthenticationCleartextPassword AuthResponseType = 3
+	AuthenticationMD5Password AuthResponseType = 5
+	AuthenticationSCMCredential AuthResponseType = 6
+	AuthenticationGSS AuthResponseType = 7
+	AuthenticationSSPI AuthResponseType = 9
+	AuthenticationGSSContinue AuthResponseType = 8
+)
+
+type AuthResponse struct {
+	Subtype AuthResponseType
+	Payload []byte
+}
+
 type ProtoStream struct {
 	str *Stream
 	next byte
@@ -77,4 +95,24 @@ func (p *ProtoStream) SendTerminate() (err error) {
 	}
 	_, err = p.str.WriteInt32(4) // message size
 	return err
+}
+
+func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	subtype, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	var rest []byte
+	if size - 8 > 0 {
+		rest = make([]byte, size - 8)
+		_, err = p.str.Read(rest)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &AuthResponse{AuthResponseType(subtype), rest}, nil
 }
