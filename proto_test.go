@@ -150,3 +150,19 @@ func TestReceiveAuthResponse(t *testing.T) {
 		}
 	}
 }
+
+func TestReceiveBackendKeyData(t *testing.T) {
+	s := newProtoStreamContent([]byte{0x0, 0x0, 0x0, 0xC,
+		0x0, 0x0, 0x1, 0x2,
+		0x3, 0x4, 0x5, 0x6})
+	keyData, err := s.ReceiveBackendKeyData()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	if keyData.Pid != 0x102 {
+		t.Errorf("want pid 0x102; got %x", keyData.Pid)
+	}
+	if keyData.SecretKey != 0x03040506 {
+		t.Errorf("want secret 0x03040506; got %x", keyData.SecretKey)
+	}
+}

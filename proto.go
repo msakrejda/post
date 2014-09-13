@@ -22,6 +22,11 @@ type AuthResponse struct {
 	Payload []byte
 }
 
+type BackendKeyData struct {
+	Pid int32
+	SecretKey int32
+}
+
 type ProtoStream struct {
 	str *Stream
 	next byte
@@ -115,4 +120,23 @@ func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) 
 		}
 	}
 	return &AuthResponse{AuthResponseType(subtype), rest}, nil
+}
+
+func (p *ProtoStream) ReceiveBackendKeyData() (keyData *BackendKeyData, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	if size != 12 {
+		return nil, fmt.Errorf("post: expected 12 byte BackendKeyData; got %v", size)
+	}
+	pid, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	key, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	return &BackendKeyData{pid, key}, nil
 }
