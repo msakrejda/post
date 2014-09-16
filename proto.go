@@ -259,3 +259,16 @@ func (p *ProtoStream) ReceiveCloseComplete() (err error) {
 	}
 	return nil
 }
+
+func (p *ProtoStream) ReceiveCommandComplete() (tag string, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return "", err
+	}
+	tag, err = p.str.ReadCString()
+	if int32(4 + len(tag) + 1) != size {
+		return "", fmt.Errorf("post: expected %v byte CommandComplete; got %v",
+			size, 4 + len(tag) + 1)
+	}
+	return tag, err
+}

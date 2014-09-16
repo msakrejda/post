@@ -298,3 +298,30 @@ func TestReceiveCloseComplete(t *testing.T) {
 		t.Errorf("want nil err; got %v", err)
 	}
 }
+
+var commandCompleteTests = []struct{
+	tag string
+	msgBytes []byte
+}{
+	{"INSERT 1 0", []byte{0x0,0x0,0x0,0xF,'I','N','S','E','R','T',' ','1',' ', '0', 0x0}},
+	{"DELETE 42", []byte{0x0,0x0,0x0,0xE,'D','E','L','E','T','E',' ','4','2', 0x0}},
+	{"UPDATE 3", []byte{0x0,0x0,0x0,0xD,'U','P','D','A','T','E',' ','3', 0x0}},
+	{"SELECT 1", []byte{0x0,0x0,0x0,0xD,'S','E','L','E','C','T',' ','1', 0x0}},
+	{"MOVE 2", []byte{0x0,0x0,0x0,0xB,'M','O','V','E',' ','2', 0x0}},
+	{"FETCH 4", []byte{0x0,0x0,0x0,0xC,'F','E','T','C','H',' ','4', 0x0}},
+	{"COPY 7", []byte{0x0,0x0,0x0,0xB,'C','O','P','Y',' ','7', 0x0}},
+}
+
+func TestReceiveCommandComplete(t *testing.T) {
+	for i, tt := range commandCompleteTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		cmd, err := s.ReceiveCommandComplete()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if tt.tag != cmd {
+			t.Errorf("%d: want tag %v; got %v", i, tt.tag, cmd)
+		}
+	}
+}
+
