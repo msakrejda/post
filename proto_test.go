@@ -291,3 +291,10 @@ func TestReceiveBindComplete(t *testing.T) {
 	}
 }
 
+func TestReceiveCloseComplete(t *testing.T) {
+	s := newProtoStreamContent([]byte{0x0, 0x0, 0x0, 0x4})
+	err := s.ReceiveCloseComplete()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+}

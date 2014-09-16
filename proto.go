@@ -248,3 +248,14 @@ func (p *ProtoStream) ReceiveBindComplete() (err error) {
 	}
 	return nil
 }
+
+func (p *ProtoStream) ReceiveCloseComplete() (err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return err
+	}
+	if size != 4 {
+		return fmt.Errorf("post: expected 4 byte CloseComplete; got %v", size)
+	}
+	return nil
+}
