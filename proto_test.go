@@ -44,7 +44,7 @@ func TestExpectExpected(t *testing.T) {
 	}
 }
 
-func TextExpectError(t *testing.T) {
+func TestExpectError(t *testing.T) {
 	s := newProtoStreamContent([]byte{})
 	err := s.Expect('x')
 	if err == nil {
