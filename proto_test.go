@@ -213,6 +213,28 @@ func TestSendCancelRequest(t *testing.T) {
 	}
 }
 
+var closeTests = []struct{
+	kind CloseType
+	target string
+	msgBytes []byte
+}{
+	{'C', "", []byte{0x0, 0x0, 0x0, 0x6, 'C', 0x0}},
+	{'C', "hello", []byte{0x0, 0x0, 0x0, 0xb, 'C', 'h', 'e', 'l', 'l', 'o', 0x0}},
+	{'P', "", []byte{0x0, 0x0, 0x0, 0x6, 'P', 0x0}},
+	{'P', "yo", []byte{0x0, 0x0, 0x0, 0x8, 'P', 'y', 'o', 0x0}},
+}
+
+func TestClose(t *testing.T) {
+	for i, tt := range closeTests {
+		s, buf := newProtoStream()
+		err := s.SendClose(tt.kind, tt.target)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
+
 var authRecvTests = []struct{
 	authType AuthResponseType
 	payload []byte

@@ -17,6 +17,13 @@ const (
 	AuthenticationGSSContinue AuthResponseType = 8
 )
 
+type CloseType byte
+
+const (
+	CloseStatement CloseType = 'S'
+	ClosePortal CloseType = 'P'
+)
+
 type AuthResponse struct {
 	Subtype AuthResponseType
 	Payload []byte
@@ -175,6 +182,20 @@ func (p *ProtoStream) SendCancelRequest(pid, secretKey int32) (err error) {
 		return err
 	}
 	_, err = p.str.WriteInt32(secretKey)
+	return err
+}
+
+func (p *ProtoStream) SendClose(targetType CloseType, target string) (err error) {
+	msgSize := int32(4 + 1 + len(target) + 1)
+	_, err = p.str.WriteInt32(msgSize)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteByte(byte(targetType))
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(target)
 	return err
 }
 
