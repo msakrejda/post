@@ -2,6 +2,7 @@ package post
 
 import (
 	"bytes"
+	"io"
 	"testing"
 )
 
@@ -325,3 +326,31 @@ func TestReceiveCommandComplete(t *testing.T) {
 	}
 }
 
+var beCopyDataTests = []struct{
+	data []byte
+	msgBytes []byte
+}{
+	{[]byte{},[]byte{0x0,0x0,0x0,0x4}},
+	{[]byte{'x'},[]byte{0x0,0x0,0x0,0x5,'x'}},
+	{[]byte{'y','o'},[]byte{0x0,0x0,0x0,0x6,'y','o'}},
+}
+
+func TestReceiveCopyData(t *testing.T) {
+	for i, tt := range beCopyDataTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		data, err := s.ReceiveCopyData()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		payload := make([]byte, len(tt.data))
+		_, err = io.ReadFull(data, payload)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.data, payload)
+		_, err = data.Read(payload)
+		if err != io.EOF {
+			t.Errorf("%d: want EOF; got %v", i, err)
+		}
+	}
+}

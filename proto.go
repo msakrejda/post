@@ -2,6 +2,7 @@ package post
 
 import (
 	"fmt"
+	"io"
 )
 
 type AuthResponseType int32
@@ -272,3 +273,12 @@ func (p *ProtoStream) ReceiveCommandComplete() (tag string, err error) {
 	}
 	return tag, err
 }
+
+func (p *ProtoStream) ReceiveCopyData() (data io.Reader, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	return io.LimitReader(p.str, int64(size - 4)), nil
+}
+
