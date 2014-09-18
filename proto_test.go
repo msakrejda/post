@@ -256,6 +256,16 @@ func TestSendCopyData(t *testing.T) {
 	}
 }
 
+func TestSendCopyDone(t *testing.T) {
+	s, buf := newProtoStream()
+	err := s.SendCopyDone()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	expected := []byte{'c', 0x0, 0x0, 0x0, 0x4}
+	compareBytes(t, expected, buf.Bytes())
+}
+
 var authRecvTests = []struct{
 	authType AuthResponseType
 	payload []byte

@@ -213,6 +213,15 @@ func (p *ProtoStream) SendCopyData(data []byte) (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendCopyDone() (err error) {
+	_, err = p.str.WriteByte('c')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
