@@ -18,6 +18,37 @@ func compareBytesN(n int, t *testing.T, expected, actual []byte) {
 	}
 }
 
+func compareFormats(t *testing.T, expected, actual []DataFormat) {
+	if len(expected) != len(actual) {
+		t.Errorf("want %v entries; got %v", len(expected), len(actual))
+	}
+	var equal = true
+	for i := 0; i < len(expected) && equal; i++ {
+		if expected[i] != actual[i] {
+			equal = false
+		}
+	}
+	if !equal {
+		t.Errorf("want\n\t%#v;\ngot\n\t%#v", expected, actual)
+	}
+}
+
+func compareFormatsN(n int, t *testing.T, expected, actual []DataFormat) {
+	if len(expected) != len(actual) {
+		t.Errorf("%d: want %v entries; got %v", n,
+			len(expected), len(actual))
+	}
+	var equal = true
+	for i := 0; i < len(expected) && equal; i++ {
+		if expected[i] != actual[i] {
+			equal = false
+		}
+	}
+	if !equal {
+		t.Errorf("%d: want\n\t%#v;\ngot\n\t%#v", n,
+			expected, actual)
+	}
+}
 
 func newProtoStream() (*ProtoStream, *bytes.Buffer) {
 	b := FakeBufferedStreamer{}
@@ -401,5 +432,41 @@ func TestReceiveCopyData(t *testing.T) {
 		if err != io.EOF {
 			t.Errorf("%d: want EOF; got %v", i, err)
 		}
+	}
+}
+
+var copyInResponseTests = []struct{
+	copyFormat CopyFormat
+	colFormats []DataFormat
+	msgBytes []byte
+}{
+	{0x0, []DataFormat{0}, []byte{
+		0x0,0x0,0x0,0x9, // length
+		0x0,     // overall copy format
+		0x0,0x1, // column count
+		0x0,0x0, // col 1 format
+	}},
+	{0x1, []DataFormat{0,1,0}, []byte{
+		0x0,0x0,0x0,0xD, // length
+		0x1,     // overall copy format
+		0x0,0x3, // column count
+		0x0,0x0, // col 1 format
+		0x0,0x1, // col 2 format
+		0x0,0x0, // col 3 format
+	}},
+}
+
+func TestReceiveCopyInResponse(t *testing.T) {
+	for i, tt := range copyInResponseTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveCopyInResponse()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if response.Format != tt.copyFormat {
+			t.Errorf("%d: want copy format %v; got %v", i,
+				tt.copyFormat, response.Format)
+		}
+		compareFormatsN(i, t, tt.colFormats, response.ColumnFormats)
 	}
 }

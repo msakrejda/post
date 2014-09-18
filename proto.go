@@ -25,6 +25,20 @@ const (
 	ClosePortal CloseType = 'P'
 )
 
+type DataFormat int16
+
+const (
+	TextFormat DataFormat = 0
+	BinaryFormat DataFormat = 1
+)
+
+type CopyFormat byte
+
+const (
+	CopyText CopyFormat = 0
+	CopyBinary CopyFormat = 1
+)
+
 type AuthResponse struct {
 	Subtype AuthResponseType
 	Payload []byte
@@ -33,6 +47,11 @@ type AuthResponse struct {
 type BackendKeyData struct {
 	Pid int32
 	SecretKey int32
+}
+
+type CopyResponse struct {
+	Format CopyFormat
+	ColumnFormats []DataFormat
 }
 
 type ProtoStream struct {
@@ -315,4 +334,33 @@ func (p *ProtoStream) ReceiveCopyData() (data io.Reader, err error) {
 		return nil, err
 	}
 	return io.LimitReader(p.str, int64(size - 4)), nil
+}
+
+func (p *ProtoStream) ReceiveCopyInResponse() (response *CopyResponse, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	format, err := p.str.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	colCount, err := p.str.ReadInt16()
+	if err != nil {
+		return nil, err
+	}
+	colFormats := make([]DataFormat, colCount)
+	for i, _ := range colFormats {
+		fmt, err := p.str.ReadInt16()
+		if err != nil {
+			return nil, err
+		}
+		colFormats[i] = DataFormat(fmt)
+	}
+	read := 4 + 1 + 2 + (2 * int32(colCount))
+	if read != size {
+		return nil, fmt.Errorf("post: expected %v byte CopyInResponse; got %v",
+			size, read)
+	}
+	return &CopyResponse{CopyFormat(format), colFormats}, nil
 }
