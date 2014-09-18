@@ -200,6 +200,19 @@ func (p *ProtoStream) SendClose(targetType CloseType, target string) (err error)
 	return err
 }
 
+func (p *ProtoStream) SendCopyData(data []byte) (err error) {
+	_, err = p.str.WriteByte('d')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4 + int32(len(data)))
+	if err != nil {
+		return err
+	}
+	_, err = p.str.Write(data)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
@@ -281,4 +294,3 @@ func (p *ProtoStream) ReceiveCopyData() (data io.Reader, err error) {
 	}
 	return io.LimitReader(p.str, int64(size - 4)), nil
 }
-

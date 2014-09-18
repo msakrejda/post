@@ -354,3 +354,23 @@ func TestReceiveCopyData(t *testing.T) {
 		}
 	}
 }
+
+var feCopyDataTests = []struct{
+	data []byte
+	msgBytes []byte
+}{
+	{[]byte{},[]byte{'d',0x0,0x0,0x0,0x4}},
+	{[]byte{'x'},[]byte{'d',0x0,0x0,0x0,0x5,'x'}},
+	{[]byte{'y','o'},[]byte{'d',0x0,0x0,0x0,0x6,'y','o'}},
+}
+
+func TestSendCopyData(t *testing.T) {
+	for i, tt := range feCopyDataTests {
+		s, buf := newProtoStream()
+		err := s.SendCopyData(tt.data)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
