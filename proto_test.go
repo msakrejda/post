@@ -266,6 +266,25 @@ func TestSendCopyDone(t *testing.T) {
 	compareBytes(t, expected, buf.Bytes())
 }
 
+var copyFailTests = []struct{
+	reason string
+	msgBytes []byte
+}{
+	{"", []byte{'f',0x0,0x0,0x0,0x5,0x0}},
+	{"bad copy", []byte{'f',0x0,0x0,0x0,0xd,'b','a','d',' ','c','o','p','y',0x0}},
+}
+
+func TestSendCopyFail(t *testing.T) {
+	for i, tt := range copyFailTests {
+		s, buf := newProtoStream()
+		err := s.SendCopyFail(tt.reason)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
+
 var authRecvTests = []struct{
 	authType AuthResponseType
 	payload []byte

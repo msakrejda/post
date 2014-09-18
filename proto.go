@@ -222,6 +222,19 @@ func (p *ProtoStream) SendCopyDone() (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendCopyFail(reason string) (err error) {
+	_, err = p.str.WriteByte('f')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4 + int32(len(reason)) + 1)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(reason)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
