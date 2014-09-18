@@ -225,10 +225,30 @@ var closeTests = []struct{
 	{'P', "yo", []byte{0x0, 0x0, 0x0, 0x8, 'P', 'y', 'o', 0x0}},
 }
 
-func TestClose(t *testing.T) {
+func TestSendClose(t *testing.T) {
 	for i, tt := range closeTests {
 		s, buf := newProtoStream()
 		err := s.SendClose(tt.kind, tt.target)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
+
+var feCopyDataTests = []struct{
+	data []byte
+	msgBytes []byte
+}{
+	{[]byte{},[]byte{'d',0x0,0x0,0x0,0x4}},
+	{[]byte{'x'},[]byte{'d',0x0,0x0,0x0,0x5,'x'}},
+	{[]byte{'y','o'},[]byte{'d',0x0,0x0,0x0,0x6,'y','o'}},
+}
+
+func TestSendCopyData(t *testing.T) {
+	for i, tt := range feCopyDataTests {
+		s, buf := newProtoStream()
+		err := s.SendCopyData(tt.data)
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
@@ -352,25 +372,5 @@ func TestReceiveCopyData(t *testing.T) {
 		if err != io.EOF {
 			t.Errorf("%d: want EOF; got %v", i, err)
 		}
-	}
-}
-
-var feCopyDataTests = []struct{
-	data []byte
-	msgBytes []byte
-}{
-	{[]byte{},[]byte{'d',0x0,0x0,0x0,0x4}},
-	{[]byte{'x'},[]byte{'d',0x0,0x0,0x0,0x5,'x'}},
-	{[]byte{'y','o'},[]byte{'d',0x0,0x0,0x0,0x6,'y','o'}},
-}
-
-func TestSendCopyData(t *testing.T) {
-	for i, tt := range feCopyDataTests {
-		s, buf := newProtoStream()
-		err := s.SendCopyData(tt.data)
-		if err != nil {
-			t.Errorf("%d: want nil err; got %v", i, err)
-		}
-		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
