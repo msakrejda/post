@@ -344,6 +344,10 @@ func (p *ProtoStream) ReceiveCopyOutResponse() (response *CopyResponse, err erro
 	return p.receiveCopyResponse()
 }
 
+func (p *ProtoStream) ReceiveCopyBothResponse() (response *CopyResponse, err error) {
+	return p.receiveCopyResponse()
+}
+
 func (p *ProtoStream) receiveCopyResponse() (response *CopyResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {

@@ -485,3 +485,18 @@ func TestReceiveCopyOutResponse(t *testing.T) {
 		compareFormatsN(i, t, tt.colFormats, response.ColumnFormats)
 	}
 }
+
+func TestReceiveCopyBothResponse(t *testing.T) {
+	for i, tt := range copyResponseTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveCopyBothResponse()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if response.Format != tt.copyFormat {
+			t.Errorf("%d: want copy format %v; got %v", i,
+				tt.copyFormat, response.Format)
+		}
+		compareFormatsN(i, t, tt.colFormats, response.ColumnFormats)
+	}
+}
