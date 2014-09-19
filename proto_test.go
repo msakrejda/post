@@ -435,7 +435,7 @@ func TestReceiveCopyData(t *testing.T) {
 	}
 }
 
-var copyInResponseTests = []struct{
+var copyResponseTests = []struct{
 	copyFormat CopyFormat
 	colFormats []DataFormat
 	msgBytes []byte
@@ -457,9 +457,24 @@ var copyInResponseTests = []struct{
 }
 
 func TestReceiveCopyInResponse(t *testing.T) {
-	for i, tt := range copyInResponseTests {
+	for i, tt := range copyResponseTests {
 		s := newProtoStreamContent(tt.msgBytes)
 		response, err := s.ReceiveCopyInResponse()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if response.Format != tt.copyFormat {
+			t.Errorf("%d: want copy format %v; got %v", i,
+				tt.copyFormat, response.Format)
+		}
+		compareFormatsN(i, t, tt.colFormats, response.ColumnFormats)
+	}
+}
+
+func TestReceiveCopyOutResponse(t *testing.T) {
+	for i, tt := range copyResponseTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveCopyOutResponse()
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}

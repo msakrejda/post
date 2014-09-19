@@ -337,6 +337,14 @@ func (p *ProtoStream) ReceiveCopyData() (data io.Reader, err error) {
 }
 
 func (p *ProtoStream) ReceiveCopyInResponse() (response *CopyResponse, err error) {
+	return p.receiveCopyResponse()
+}
+
+func (p *ProtoStream) ReceiveCopyOutResponse() (response *CopyResponse, err error) {
+	return p.receiveCopyResponse()
+}
+
+func (p *ProtoStream) receiveCopyResponse() (response *CopyResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
