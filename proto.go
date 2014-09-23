@@ -254,6 +254,23 @@ func (p *ProtoStream) SendCopyFail(reason string) (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendDescribe(kind TargetKind, name string) (err error) {
+	_, err = p.str.WriteByte('D')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4 + 1 + int32(len(name)) + 1)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteByte(byte(kind))
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(name)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {

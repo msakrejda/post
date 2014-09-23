@@ -245,7 +245,7 @@ func TestSendCancelRequest(t *testing.T) {
 }
 
 var closeTests = []struct {
-	kind TargetKind
+	kind     TargetKind
 	target   string
 	msgBytes []byte
 }{
@@ -308,6 +308,28 @@ func TestSendCopyFail(t *testing.T) {
 	for i, tt := range copyFailTests {
 		s, buf := newProtoStream()
 		err := s.SendCopyFail(tt.reason)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
+
+var describeTests = []struct {
+	kind     TargetKind
+	name     string
+	msgBytes []byte
+}{
+	{'S', "", []byte{'D', 0x0, 0x0, 0x0, 0x6, 'S', 0x0}},
+	{'P', "", []byte{'D', 0x0, 0x0, 0x0, 0x6, 'P', 0x0}},
+	{'S', "joe", []byte{'D', 0x0, 0x0, 0x0, 0x9, 'S', 'j', 'o', 'e', 0x0}},
+	{'P', "emily", []byte{'D', 0x0, 0x0, 0x0, 0xB, 'P', 'e', 'm', 'i', 'l', 'y', 0x0}},
+}
+
+func TestSendDescribe(t *testing.T) {
+	for i, tt := range describeTests {
+		s, buf := newProtoStream()
+		err := s.SendDescribe(tt.kind, tt.name)
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
