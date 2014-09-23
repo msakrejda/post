@@ -376,3 +376,39 @@ func (p *ProtoStream) receiveCopyResponse() (response *CopyResponse, err error) 
 	}
 	return &CopyResponse{CopyFormat(format), colFormats}, nil
 }
+
+func (p *ProtoStream) ReceiveDataRow() (data [][]byte, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	var totRead int32 = 4
+	colCount, err := p.str.ReadInt16()
+	if err != nil {
+		return nil, err
+	}
+	totRead += 2
+	// TODO: avoid allocations here
+	data = make([][]byte, colCount)
+	for i := int16(0); i < colCount; i++ {
+		fieldSize, err := p.str.ReadInt32()
+		if err != nil {
+			return nil, err
+		}
+		totRead += 4
+		if fieldSize > -1 {
+			data[i] = make([]byte, fieldSize)
+			_, err = io.ReadFull(p.str, data[i])
+			if err != nil {
+				return nil, err
+			}
+			totRead += fieldSize
+		}
+	}
+	if totRead == size {
+		return data, nil
+	} else {
+		return nil, fmt.Errorf("post: expected %v byte DataRow; got %v", size, totRead)
+	}
+}
+

@@ -500,3 +500,46 @@ func TestReceiveCopyBothResponse(t *testing.T) {
 		compareFormatsN(i, t, tt.colFormats, response.ColumnFormats)
 	}
 }
+
+var dataRowTests = []struct{
+	data [][]byte
+	msgBytes []byte
+}{
+	{[][]byte{}, []byte{
+		0x0,0x0,0x0,0x6,     // length
+		0x0,0x0,             // field count
+	}},
+	{[][]byte{nil}, []byte{
+		0x0,0x0,0x0,0xA,     // length
+		0x0,0x1,             // field count
+		0xFF,0xFF,0xFF,0xFF, // field 1 length
+	}},
+	{[][]byte{[]byte{0xF}}, []byte{
+		0x0,0x0,0x0,0xB, // length
+		0x0,0x1,         // field count
+		0x0,0x0,0x0,0x1, // field 1 length
+		0xF,             // feild 1 bytes
+	}},
+	{[][]byte{[]byte{0xF,0x3},nil,[]byte{0x0,0xA,0x2}}, []byte{
+		0x0,0x0,0x0,0x17, // length
+		0x0,0x3,          // field count
+		0x0,0x0,0x0,0x2,  // field 1 length
+		0xF,0x3,          // field 1 bytes
+		0xFF,0xFF,0xFF,0xFF, // field 2 length
+		0x0,0x0,0x0,0x3,  // field 3 length
+		0x0,0xA,0x2,      // field 3 bytes
+	}},
+}
+
+func TestReceiveDataRow(t *testing.T) {
+	for i, tt := range dataRowTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveDataRow()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		for j, colData := range response {
+			compareBytesN(i, t, tt.data[j], colData)
+		}
+	}
+}
