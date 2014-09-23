@@ -8,34 +8,34 @@ import (
 type AuthResponseType int32
 
 const (
-	AuthenticationOk AuthResponseType = 0
-	AuthenticationKerberosV5 AuthResponseType = 2
+	AuthenticationOk                AuthResponseType = 0
+	AuthenticationKerberosV5        AuthResponseType = 2
 	AuthenticationCleartextPassword AuthResponseType = 3
-	AuthenticationMD5Password AuthResponseType = 5
-	AuthenticationSCMCredential AuthResponseType = 6
-	AuthenticationGSS AuthResponseType = 7
-	AuthenticationSSPI AuthResponseType = 9
-	AuthenticationGSSContinue AuthResponseType = 8
+	AuthenticationMD5Password       AuthResponseType = 5
+	AuthenticationSCMCredential     AuthResponseType = 6
+	AuthenticationGSS               AuthResponseType = 7
+	AuthenticationSSPI              AuthResponseType = 9
+	AuthenticationGSSContinue       AuthResponseType = 8
 )
 
-type CloseType byte
+type TargetKind byte
 
 const (
-	CloseStatement CloseType = 'S'
-	ClosePortal CloseType = 'P'
+	Statement TargetKind = 'S'
+	Portal    TargetKind = 'P'
 )
 
 type DataFormat int16
 
 const (
-	TextFormat DataFormat = 0
+	TextFormat   DataFormat = 0
 	BinaryFormat DataFormat = 1
 )
 
 type CopyFormat byte
 
 const (
-	CopyText CopyFormat = 0
+	CopyText   CopyFormat = 0
 	CopyBinary CopyFormat = 1
 )
 
@@ -45,17 +45,17 @@ type AuthResponse struct {
 }
 
 type BackendKeyData struct {
-	Pid int32
+	Pid       int32
 	SecretKey int32
 }
 
 type CopyResponse struct {
-	Format CopyFormat
+	Format        CopyFormat
 	ColumnFormats []DataFormat
 }
 
 type ProtoStream struct {
-	str *Stream
+	str  *Stream
 	next byte
 }
 
@@ -136,9 +136,9 @@ func (p *ProtoStream) SendBind(portal string, statement string,
 		return err
 	}
 	msgSize := 4 + (len(portal) + 1) + (len(statement) + 1) +
-		(2 + len(formats) * 2) +
+		(2 + len(formats)*2) +
 		2 + // param count; we account for actual params below
-		(2 + len(resultFormats) * 2)
+		(2 + len(resultFormats)*2)
 	for _, param := range params {
 		msgSize += 4 + len(param)
 	}
@@ -205,7 +205,7 @@ func (p *ProtoStream) SendCancelRequest(pid, secretKey int32) (err error) {
 	return err
 }
 
-func (p *ProtoStream) SendClose(targetType CloseType, target string) (err error) {
+func (p *ProtoStream) SendClose(targetType TargetKind, target string) (err error) {
 	msgSize := int32(4 + 1 + len(target) + 1)
 	_, err = p.str.WriteInt32(msgSize)
 	if err != nil {
@@ -264,8 +264,8 @@ func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) 
 		return nil, err
 	}
 	var rest []byte
-	if size - 8 > 0 {
-		rest = make([]byte, size - 8)
+	if size-8 > 0 {
+		rest = make([]byte, size-8)
 		_, err = p.str.Read(rest)
 		if err != nil {
 			return nil, err
@@ -321,9 +321,9 @@ func (p *ProtoStream) ReceiveCommandComplete() (tag string, err error) {
 		return "", err
 	}
 	tag, err = p.str.ReadCString()
-	if int32(4 + len(tag) + 1) != size {
+	if int32(4+len(tag)+1) != size {
 		return "", fmt.Errorf("post: expected %v byte CommandComplete; got %v",
-			size, 4 + len(tag) + 1)
+			size, 4+len(tag)+1)
 	}
 	return tag, err
 }
@@ -333,7 +333,7 @@ func (p *ProtoStream) ReceiveCopyData() (data io.Reader, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return io.LimitReader(p.str, int64(size - 4)), nil
+	return io.LimitReader(p.str, int64(size-4)), nil
 }
 
 func (p *ProtoStream) ReceiveCopyInResponse() (response *CopyResponse, err error) {
@@ -411,4 +411,3 @@ func (p *ProtoStream) ReceiveDataRow() (data [][]byte, err error) {
 		return nil, fmt.Errorf("post: expected %v byte DataRow; got %v", size, totRead)
 	}
 }
-

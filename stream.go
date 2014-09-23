@@ -12,8 +12,8 @@ type BufferedStreamer interface {
 }
 
 type Stream struct {
-	str BufferedStreamer
-	buf [4]byte
+	str  BufferedStreamer
+	buf  [4]byte
 	buf1 []byte
 	buf2 []byte
 	buf4 []byte
