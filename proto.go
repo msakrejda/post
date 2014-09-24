@@ -428,3 +428,14 @@ func (p *ProtoStream) ReceiveDataRow() (data [][]byte, err error) {
 		return nil, fmt.Errorf("post: expected %v byte DataRow; got %v", size, totRead)
 	}
 }
+
+func (p *ProtoStream) ReceiveEmptyQueryResponse() (err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return err
+	} else if size != 4 {
+		return fmt.Errorf("post: expected 4 byte EmptyQueryResponse; got %v", size)
+	} else {
+		return nil
+	}
+}
