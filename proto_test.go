@@ -572,3 +572,41 @@ func TestReceiveEmptyQueryResponse(t *testing.T) {
 		t.Errorf("want nil err; got %v", err)
 	}
 }
+
+var errorResponseTests = []struct {
+	fields map[ErrorField]string
+	msgBytes []byte
+}{
+	{map[ErrorField]string{Message: "hello"}, []byte{
+		0x0,0x0,0x0,0xC, // length
+		byte(Message), 'h','e','l','l','o',0x0, // field 1
+		0x0}},
+	{map[ErrorField]string{Message: "x", Detail: "y"}, []byte{
+		0x0,0x0,0x0,0xB, // length
+		byte(Message), 'x',0x0, // field 1
+		byte(Detail), 'y',0x0, // field 2
+		0x0}},
+}
+
+func TestReceiveErrorResponse(t *testing.T) {
+	for i, tt := range errorResponseTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveErrorResponse()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if expected, actual := len(tt.fields), len(response); expected != actual {
+			t.Errorf("%d: want %v fields; got %v", i, expected, actual)
+		}
+		for k, expectedVal := range tt.fields {
+			actualVal, ok := response[k]
+			if !ok {
+				t.Errorf("%d: want field %c present; is absent", i, k)
+			}
+			if expectedVal != actualVal {
+				t.Errorf("%d: want field %v to be %v; got %v", i, k,
+					expectedVal, actualVal)
+			}
+		}
+	}
+}

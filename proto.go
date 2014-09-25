@@ -54,6 +54,28 @@ type CopyResponse struct {
 	ColumnFormats []DataFormat
 }
 
+type ErrorField byte
+
+const (
+	Severity         ErrorField = 'S'
+	Code             ErrorField = 'C'
+	Message          ErrorField = 'M'
+	Detail           ErrorField = 'D'
+	Hint             ErrorField = 'H'
+	Position         ErrorField = 'P'
+	InternalPosition ErrorField = 'p'
+	InternalQuery    ErrorField = 'q'
+	Where            ErrorField = 'W'
+	Schema           ErrorField = 's'
+	Table            ErrorField = 't'
+	Column           ErrorField = 'c'
+	DataType         ErrorField = 'd'
+	Constraint       ErrorField = 'n'
+	File             ErrorField = 'F'
+	Line             ErrorField = 'L'
+	Routine          ErrorField = 'R'
+)
+
 type ProtoStream struct {
 	str  *Stream
 	next byte
@@ -437,5 +459,32 @@ func (p *ProtoStream) ReceiveEmptyQueryResponse() (err error) {
 		return fmt.Errorf("post: expected 4 byte EmptyQueryResponse; got %v", size)
 	} else {
 		return nil
+	}
+}
+
+func (p *ProtoStream) ReceiveErrorResponse() (response map[ErrorField]string, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	response = make(map[ErrorField]string)
+	var totRead int32 = 4
+	for code, err := p.str.ReadByte(); err == nil && code != 0x0; code, err = p.str.ReadByte() {
+		str, err := p.str.ReadCString()
+		if err != nil {
+			return nil, err
+		}
+
+		response[ErrorField(code)] = str
+		totRead += 1 /* for code */ + int32(len(str)) + 1
+	}
+	if err != nil {
+		return nil, err
+	}
+	totRead += 1 // for last code
+	if totRead == size {
+		return response, nil
+	} else {
+		return nil, fmt.Errorf("post: expected %v byte ErrorResponse; got %v", size, totRead)
 	}
 }
