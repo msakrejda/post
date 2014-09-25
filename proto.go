@@ -514,3 +514,14 @@ func (p *ProtoStream) ReceiveErrorResponse() (response map[ErrorField]string, er
 		return nil, fmt.Errorf("post: expected %v byte ErrorResponse; got %v", size, totRead)
 	}
 }
+
+func (p *ProtoStream) ReceiveNoData() (err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return err
+	} else if size != 4 {
+		return fmt.Errorf("post: expected 4 byte NoData; got %v", size)
+	} else {
+		return nil
+	}
+}

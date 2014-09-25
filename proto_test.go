@@ -645,3 +645,11 @@ func TestReceiveErrorResponse(t *testing.T) {
 		}
 	}
 }
+
+func TestReceiveNoData(t *testing.T) {
+	s := newProtoStreamContent([]byte{0x0, 0x0, 0x0, 0x4})
+	err := s.ReceiveNoData()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+}
