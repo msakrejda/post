@@ -363,6 +363,15 @@ func TestSendExecute(t *testing.T) {
 	}
 }
 
+func TestSendFlush(t *testing.T) {
+	s, buf := newProtoStream()
+	err := s.SendFlush()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	compareBytes(t, []byte{'H',0x0,0x0,0x0,0x4}, buf.Bytes())
+}
+
 var authRecvTests = []struct {
 	authType AuthResponseType
 	payload  []byte

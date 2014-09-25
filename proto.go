@@ -310,6 +310,15 @@ func (p *ProtoStream) SendExecute(portal string, maxRows int32) (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendFlush() (err error) {
+	_, err = p.str.WriteByte('H')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
