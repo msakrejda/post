@@ -337,6 +337,32 @@ func TestSendDescribe(t *testing.T) {
 	}
 }
 
+var executeTests = []struct {
+	portal string
+	maxRows int32
+	msgBytes []byte
+}{
+	{"", 0, []byte{'E',
+		0x0,0x0,0x0,0x9,
+		0x0,
+		0x0,0x0,0x0,0x0}},
+	{"steve", 1, []byte{'E',
+		0x0,0x0,0x0,0xe,
+		's','t','e','v','e',0x0,
+		0x0,0x0,0x0,0x1}},
+}
+
+func TestSendExecute(t *testing.T) {
+	for i, tt := range executeTests {
+		s, buf := newProtoStream()
+		err := s.SendExecute(tt.portal, tt.maxRows)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
+
 var authRecvTests = []struct {
 	authType AuthResponseType
 	payload  []byte

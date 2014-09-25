@@ -293,6 +293,23 @@ func (p *ProtoStream) SendDescribe(kind TargetKind, name string) (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendExecute(portal string, maxRows int32) (err error) {
+	_, err = p.str.WriteByte('E')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4 + int32(len(portal)) + 1 + 4)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(portal)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(maxRows)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
