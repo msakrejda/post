@@ -19,14 +19,17 @@ func compareBytesN(n int, t *testing.T, expected, actual []byte) {
 }
 
 func compareFormats(t *testing.T, expected, actual []DataFormat) {
-	if len(expected) != len(actual) {
-		t.Errorf("want %v entries; got %v", len(expected), len(actual))
-	}
-	var equal = true
-	for i := 0; i < len(expected) && equal; i++ {
-		if expected[i] != actual[i] {
-			equal = false
+	var equal bool
+	if len(expected) == len(actual) {
+		equal = true
+		for i := 0; i < len(expected) && equal; i++ {
+			if expected[i] != actual[i] {
+				equal = false
+			}
 		}
+	} else {
+		t.Errorf("want %v entries; got %v", len(expected), len(actual))
+		equal = false
 	}
 	if !equal {
 		t.Errorf("want\n\t%#v;\ngot\n\t%#v", expected, actual)
@@ -34,15 +37,19 @@ func compareFormats(t *testing.T, expected, actual []DataFormat) {
 }
 
 func compareFormatsN(n int, t *testing.T, expected, actual []DataFormat) {
-	if len(expected) != len(actual) {
+	var equal bool
+	if len(expected) == len(actual) {
+		equal = true
+		for i := 0; i < len(expected) && equal; i++ {
+			if expected[i] != actual[i] {
+				equal = false
+			}
+		}
+	} else {
 		t.Errorf("%d: want %v entries; got %v", n,
 			len(expected), len(actual))
-	}
-	var equal = true
-	for i := 0; i < len(expected) && equal; i++ {
-		if expected[i] != actual[i] {
-			equal = false
-		}
+		equal = false
+
 	}
 	if !equal {
 		t.Errorf("%d: want\n\t%#v;\ngot\n\t%#v", n,
