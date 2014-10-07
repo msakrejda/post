@@ -667,3 +667,41 @@ func TestReceiveNoData(t *testing.T) {
 		t.Errorf("want nil err; got %v", err)
 	}
 }
+
+
+var notificationResponseTests = []struct {
+	pid int32
+	channel string
+	payload string
+	msgBytes []byte
+}{
+	{4, "x", "", []byte{0x0,0x0,0x0,0xB,
+		0x0,0x0,0x0,0x4, // pid
+		'x',0x0, // channel
+		0x0, // payload
+	}},
+	{4, "foo", "bar", []byte{0x0,0x0,0x0,0x10,
+		0x0,0x0,0x0,0x4, // pid
+		'f','o','o',0x0, // channel
+		'b','a','r',0x0, // payload
+	}},
+}
+
+func TestReceiveNotificationResponse(t *testing.T) {
+	for i, tt := range notificationResponseTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveNotificationResponse()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if tt.pid != response.Pid {
+			t.Errorf("%d: want pid %v; got %v", i, tt.pid, response.Pid)
+		}
+		if tt.channel != response.Channel {
+			t.Errorf("%d: want channel %v; got %v", i, tt.channel, response.Channel)
+		}
+		if tt.payload != response.Payload {
+			t.Errorf("%d: want payload %v; got %v", i, tt.payload, response.Payload)
+		}
+	}
+}

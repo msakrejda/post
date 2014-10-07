@@ -54,6 +54,12 @@ type CopyResponse struct {
 	ColumnFormats []DataFormat
 }
 
+type Notification struct {
+	Pid int32
+	Channel string
+	Payload string
+}
+
 type ErrorField byte
 
 const (
@@ -528,5 +534,33 @@ func (p *ProtoStream) ReceiveNoData() (err error) {
 		return fmt.Errorf("post: expected 4 byte NoData; got %v", size)
 	} else {
 		return nil
+	}
+}
+
+func (p *ProtoStream) ReceiveNotificationResponse() (notif *Notification, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	var totRead int32 = 4
+	pid, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	totRead += 4
+	channel, err := p.str.ReadCString()
+	if err != nil {
+		return nil, err
+	}
+	totRead += int32(len(channel)) + 1
+	payload, err := p.str.ReadCString()
+	if err != nil {
+		return nil, err
+	}
+	totRead += int32(len(payload)) + 1
+	if size == totRead {
+		return &Notification{pid, channel, payload}, nil
+	} else {
+		return nil, fmt.Errorf("post: expected %v byte Notification; got %v", size, totRead)
 	}
 }
