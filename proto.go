@@ -489,6 +489,11 @@ func (p *ProtoStream) ReceiveEmptyQueryResponse() (err error) {
 }
 
 func (p *ProtoStream) ReceiveErrorResponse() (response map[ErrorField]string, err error) {
+	// literally the same thing
+	return p.ReceiveNoticeResponse()
+}
+
+func (p *ProtoStream) ReceiveNoticeResponse() (response map[ErrorField]string, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err

@@ -627,21 +627,35 @@ func TestReceiveErrorResponse(t *testing.T) {
 	for i, tt := range errorResponseTests {
 		s := newProtoStreamContent(tt.msgBytes)
 		response, err := s.ReceiveErrorResponse()
-		if err != nil {
-			t.Errorf("%d: want nil err; got %v", i, err)
+		validateErrOrNoticeRespone(i, t, err, response, tt.fields)
+	}
+}
+
+func TestReceiveNoticeResponse(t *testing.T) {
+	// for now, we use the same test data
+	for i, tt := range errorResponseTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveNoticeResponse()
+		validateErrOrNoticeRespone(i, t, err, response, tt.fields)
+	}
+}
+
+func validateErrOrNoticeRespone(i int, t *testing.T, err error,
+	response, expected map[ErrorField]string) {
+	if err != nil {
+		t.Errorf("%d: want nil err; got %v", i, err)
+	}
+	if expected, actual := len(expected), len(response); expected != actual {
+		t.Errorf("%d: want %v fields; got %v", i, expected, actual)
+	}
+	for k, expectedVal := range expected {
+		actualVal, ok := response[k]
+		if !ok {
+			t.Errorf("%d: want field %c present; is absent", i, k)
 		}
-		if expected, actual := len(tt.fields), len(response); expected != actual {
-			t.Errorf("%d: want %v fields; got %v", i, expected, actual)
-		}
-		for k, expectedVal := range tt.fields {
-			actualVal, ok := response[k]
-			if !ok {
-				t.Errorf("%d: want field %c present; is absent", i, k)
-			}
-			if expectedVal != actualVal {
-				t.Errorf("%d: want field %v to be %v; got %v", i, k,
-					expectedVal, actualVal)
-			}
+		if expectedVal != actualVal {
+			t.Errorf("%d: want field %v to be %v; got %v", i, k,
+				expectedVal, actualVal)
 		}
 	}
 }
