@@ -57,6 +57,25 @@ func compareFormatsN(n int, t *testing.T, expected, actual []DataFormat) {
 	}
 }
 
+func compareOidSliceN(n int, t *testing.T, expected, actual []Oid) {
+	var equal bool
+	if len(expected) == len(actual) {
+		equal = true
+		for i := 0; i < len(expected) && equal; i++ {
+			if expected[i] != actual[i] {
+				equal = false
+			}
+		}
+	} else {
+		t.Errorf("%d: want %v entries; got %v", n,
+			len(expected), len(actual))
+	}
+	if !equal {
+		t.Errorf("%d: want\n\t%#v;\ngot\n\t%#v", n,
+			expected, actual)
+	}
+}
+
 func newProtoStream() (*ProtoStream, *bytes.Buffer) {
 	b := FakeBufferedStreamer{}
 	s := NewStream(&b)
@@ -710,5 +729,34 @@ func TestReceiveNotificationResponse(t *testing.T) {
 		if tt.payload != response.Payload {
 			t.Errorf("%d: want payload %v; got %v", i, tt.payload, response.Payload)
 		}
+	}
+}
+
+var parameterDescriptionTests = []struct {
+	oids []Oid
+	msgBytes []byte
+}{
+	{[]Oid{}, []byte{0x0,0x0,0x0,0x6,
+		0x0,0x0,
+	}},
+	{[]Oid{3}, []byte{0x0,0x0,0x0,0xA,
+		0x0,0x1,
+		0x0,0x0,0x0,0x3,
+	}},
+	{[]Oid{3,2}, []byte{0x0,0x0,0x0,0xE,
+		0x0,0x2,
+		0x0,0x0,0x0,0x3,
+		0x0,0x0,0x0,0x2,
+	}},
+}
+
+func TestReceiveParameterDescription(t *testing.T) {
+	for i, tt := range parameterDescriptionTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveParameterDescription()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareOidSliceN(i, t, tt.oids, response)
 	}
 }

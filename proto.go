@@ -60,6 +60,8 @@ type Notification struct {
 	Payload string
 }
 
+type Oid uint32
+
 type ErrorField byte
 
 const (
@@ -562,5 +564,33 @@ func (p *ProtoStream) ReceiveNotificationResponse() (notif *Notification, err er
 		return &Notification{pid, channel, payload}, nil
 	} else {
 		return nil, fmt.Errorf("post: expected %v byte Notification; got %v", size, totRead)
+	}
+}
+
+func (p *ProtoStream) ReceiveParameterDescription() (desc []Oid, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	var totRead int32 = 4
+	count, err := p.str.ReadInt16()
+	if err != nil {
+		return nil, err
+	}
+	totRead += 2
+	desc = make([]Oid, count)
+	for i := int16(0); i < count; i++ {
+		param, err := p.str.ReadInt32()
+		if err != nil {
+			return nil, err
+		}
+		desc[i] = Oid(param)
+		totRead += 4
+	}
+	if size == totRead {
+		return desc, nil
+	} else {
+		return nil, fmt.Errorf("post: expected %v byte ParameterDescription; got %v",
+			size, totRead)
 	}
 }
