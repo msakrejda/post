@@ -760,3 +760,34 @@ func TestReceiveParameterDescription(t *testing.T) {
 		compareOidSliceN(i, t, tt.oids, response)
 	}
 }
+
+var parameterStatusTests = []struct {
+	param string
+	value string
+	msgBytes []byte
+}{
+	{"foo", "bar", []byte{0x0,0x0,0x0,0xC,
+		'f','o','o',0x0,
+		'b','a','r',0x0}},
+	{"server_encoding", "UTF8", []byte{0x0,0x0,0x0,0x19,
+		's','e','r','v','e','r','_','e','n','c','o','d','i','n','g',0x0,
+		'U','T','F','8',0x0}},
+}
+
+func TestReceiveParameterStatus(t *testing.T) {
+	for i, tt := range parameterStatusTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		response, err := s.ReceiveParameterStatus()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if response.Parameter != tt.param {
+			t.Errorf("%d: want parameter %v; got %v", i,
+				tt.param, response.Parameter)
+		}
+		if response.Value != tt.value {
+			t.Errorf("%d: want parameter %v; got %v", i,
+				tt.value, response.Value)
+		}
+	}
+}

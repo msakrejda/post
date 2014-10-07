@@ -60,6 +60,11 @@ type Notification struct {
 	Payload string
 }
 
+type ParameterStatus struct {
+	Parameter string
+	Value string
+}
+
 type Oid uint32
 
 type ErrorField byte
@@ -591,6 +596,30 @@ func (p *ProtoStream) ReceiveParameterDescription() (desc []Oid, err error) {
 		return desc, nil
 	} else {
 		return nil, fmt.Errorf("post: expected %v byte ParameterDescription; got %v",
+			size, totRead)
+	}
+}
+
+func (p *ProtoStream) ReceiveParameterStatus() (status *ParameterStatus, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	var totRead int32 = 4
+	param, err := p.str.ReadCString()
+	if err != nil {
+		return nil, err
+	}
+	totRead += int32(len(param)) + 1
+	value, err := p.str.ReadCString()
+	if err != nil {
+		return nil, err
+	}
+	totRead += int32(len(value)) + 1
+	if size == totRead {
+		return &ParameterStatus{param, value}, nil
+	} else {
+		return nil, fmt.Errorf("post: expected %v byte ParameterStatus; got %v",
 			size, totRead)
 	}
 }
