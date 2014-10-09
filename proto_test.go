@@ -851,3 +851,10 @@ func TestReceiveParseComplete(t *testing.T) {
 	}
 }
 
+func TestReceivePortalSuspended(t *testing.T) {
+	s := newProtoStreamContent([]byte{0x0, 0x0, 0x0, 0x4})
+	err := s.ReceivePortalSuspended()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+}

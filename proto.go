@@ -644,6 +644,10 @@ func (p *ProtoStream) ReceiveParseComplete() (err error) {
 	return p.receiveEmpty("ParseComplete")
 }
 
+func (p *ProtoStream) ReceivePortalSuspended() (err error) {
+	return p.receiveEmpty("PortalSuspended")
+}
+
 func (p *ProtoStream) receiveEmpty(name string) error {
 	size, err := p.str.ReadInt32()
 	if err != nil {
