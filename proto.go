@@ -89,6 +89,14 @@ const (
 	Routine          ErrorField = 'R'
 )
 
+type TransactionStatus byte
+
+const (
+	Idle          TransactionStatus = 'I'
+	InTransaction TransactionStatus = 'T'
+	Error         TransactionStatus = 'E'
+)
+
 type ProtoStream struct {
 	str  *Stream
 	next byte
@@ -659,6 +667,17 @@ func (p *ProtoStream) ReceiveParseComplete() (err error) {
 
 func (p *ProtoStream) ReceivePortalSuspended() (err error) {
 	return p.receiveEmpty("PortalSuspended")
+}
+
+func (p *ProtoStream) ReceiveReadyForQuery() (status TransactionStatus, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return 0x0, err
+	} else if size != 5 {
+		return 0x0, fmt.Errorf("post: expected 5 byte ReadyForQuery; got %v", size)
+	}
+	st, err := p.str.ReadByte()
+	return TransactionStatus(st), err
 }
 
 func (p *ProtoStream) receiveEmpty(name string) error {

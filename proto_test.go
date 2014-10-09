@@ -877,3 +877,25 @@ func TestReceivePortalSuspended(t *testing.T) {
 		t.Errorf("want nil err; got %v", err)
 	}
 }
+
+var rfqTests = []struct {
+	status TransactionStatus
+	msgBytes []byte
+}{
+	{'I', []byte{0x0,0x0,0x0,0x5,'I'}},
+	{'T', []byte{0x0,0x0,0x0,0x5,'T'}},
+	{'E', []byte{0x0,0x0,0x0,0x5,'E'}},
+}
+
+func TestReceiveReadyForQuery(t *testing.T) {
+	for i, tt := range rfqTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		status, err := s.ReceiveReadyForQuery()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if status != tt.status {
+			t.Errorf("%d: want status %v; got %v", i, tt.status, status)
+		}
+	}
+}
