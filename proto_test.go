@@ -430,6 +430,25 @@ func TestSendParse(t *testing.T) {
 	}
 }
 
+var passwordTests = []struct {
+	password string
+	msgBytes []byte
+}{
+	{"", []byte{'p',0x0,0x0,0x0,0x5,0x0}},
+	{"hunter2", []byte{'p',0x0,0x0,0x0,0xc,'h','u','n','t','e','r','2',0x0}},
+}
+
+func TestSendPasswordMessage(t *testing.T) {
+	for i, tt := range passwordTests {
+		s, buf := newProtoStream()
+		err := s.SendPasswordMessage(tt.password)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
+
 var authRecvTests = []struct {
 	authType AuthResponseType
 	payload  []byte
@@ -831,3 +850,4 @@ func TestReceiveParseComplete(t *testing.T) {
 		t.Errorf("want nil err; got %v", err)
 	}
 }
+
