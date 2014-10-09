@@ -376,6 +376,19 @@ func (p *ProtoStream) SendPasswordMessage(password string) (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendQuery(query string) (err error) {
+	_, err = p.str.WriteByte('Q')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4 + int32(len(query)) + 1)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(query)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {

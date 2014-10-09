@@ -449,6 +449,25 @@ func TestSendPasswordMessage(t *testing.T) {
 	}
 }
 
+var queryTests = []struct {
+	query string
+	msgBytes []byte
+}{
+	{"", []byte{'Q',0x0,0x0,0x0,0x5,0x0}},
+	{"SELECT 42", []byte{'Q',0x0,0x0,0x0,0xe,'S','E','L','E','C','T',' ','4','2',0x0}},
+}
+
+func TestSendQuery(t *testing.T) {
+	for i, tt := range queryTests {
+		s, buf := newProtoStream()
+		err := s.SendQuery(tt.query)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
+
 var authRecvTests = []struct {
 	authType AuthResponseType
 	payload  []byte
