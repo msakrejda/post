@@ -398,6 +398,38 @@ func TestSendFlush(t *testing.T) {
 	compareBytes(t, []byte{'H',0x0,0x0,0x0,0x4}, buf.Bytes())
 }
 
+var parseTests = []struct {
+	statement string
+	query string
+	paramTypes []Oid
+	msgBytes []byte
+
+}{
+	{"", "SELECT 1", []Oid{}, []byte{'P',
+		0x0,0x0,0x0,0x10,
+		0x0,
+		'S','E','L','E','C','T',' ','1', 0x0,
+		0x0, 0x0}},
+	{"steve", "SELECT $1 + $2", []Oid{Oid(20),Oid(23)}, []byte{'P',
+		0x0,0x0,0x0,0x23,
+		's','t','e','v','e',0x0,
+		'S','E','L','E','C','T',' ','$','1',' ','+',' ','$','2',0x0,
+		0x0,0x2,
+		0x0,0x0,0x0,0x14,
+		0x0,0x0,0x0,0x17}},
+}
+
+func TestSendParse(t *testing.T) {
+	for i, tt := range parseTests {
+		s, buf := newProtoStream()
+		err := s.SendParse(tt.statement, tt.query, tt.paramTypes)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
+	}
+}
+
 var authRecvTests = []struct {
 	authType AuthResponseType
 	payload  []byte

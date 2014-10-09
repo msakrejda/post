@@ -332,6 +332,37 @@ func (p *ProtoStream) SendFlush() (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendParse(statement, query string, paramTypes []Oid) (err error) {
+	_, err = p.str.WriteByte('P')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4 + int32(len(statement)) + 1 +
+		int32(len(query)) + 1 + 2 + 4 * int32(len(paramTypes)))
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(statement)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteCString(query)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt16(int16(len(paramTypes)))
+	if err != nil {
+		return err
+	}
+	for _, paramType := range paramTypes {
+		_, err = p.str.WriteInt32(int32(paramType))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
