@@ -403,25 +403,11 @@ func (p *ProtoStream) ReceiveBackendKeyData() (keyData *BackendKeyData, err erro
 }
 
 func (p *ProtoStream) ReceiveBindComplete() (err error) {
-	size, err := p.str.ReadInt32()
-	if err != nil {
-		return err
-	}
-	if size != 4 {
-		return fmt.Errorf("post: expected 4 byte BindComplete; got %v", size)
-	}
-	return nil
+	return p.receiveEmpty("BindComplete")
 }
 
 func (p *ProtoStream) ReceiveCloseComplete() (err error) {
-	size, err := p.str.ReadInt32()
-	if err != nil {
-		return err
-	}
-	if size != 4 {
-		return fmt.Errorf("post: expected 4 byte CloseComplete; got %v", size)
-	}
-	return nil
+	return p.receiveEmpty("CloseComplete")
 }
 
 func (p *ProtoStream) ReceiveCommandComplete() (tag string, err error) {
@@ -522,14 +508,7 @@ func (p *ProtoStream) ReceiveDataRow() (data [][]byte, err error) {
 }
 
 func (p *ProtoStream) ReceiveEmptyQueryResponse() (err error) {
-	size, err := p.str.ReadInt32()
-	if err != nil {
-		return err
-	} else if size != 4 {
-		return fmt.Errorf("post: expected 4 byte EmptyQueryResponse; got %v", size)
-	} else {
-		return nil
-	}
+	return p.receiveEmpty("EmptyQueryResponse")
 }
 
 func (p *ProtoStream) ReceiveErrorResponse() (response map[ErrorField]string, err error) {
@@ -565,14 +544,7 @@ func (p *ProtoStream) ReceiveNoticeResponse() (response map[ErrorField]string, e
 }
 
 func (p *ProtoStream) ReceiveNoData() (err error) {
-	size, err := p.str.ReadInt32()
-	if err != nil {
-		return err
-	} else if size != 4 {
-		return fmt.Errorf("post: expected 4 byte NoData; got %v", size)
-	} else {
-		return nil
-	}
+	return p.receiveEmpty("NoData")
 }
 
 func (p *ProtoStream) ReceiveNotificationResponse() (notif *Notification, err error) {
@@ -652,5 +624,20 @@ func (p *ProtoStream) ReceiveParameterStatus() (status *ParameterStatus, err err
 	} else {
 		return nil, fmt.Errorf("post: expected %v byte ParameterStatus; got %v",
 			size, totRead)
+	}
+}
+
+func (p *ProtoStream) ReceiveParseComplete() (err error) {
+	return p.receiveEmpty("ParseComplete")
+}
+
+func (p *ProtoStream) receiveEmpty(name string) error {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return err
+	} else if size != 4 {
+		return fmt.Errorf("post: expected 4 byte %v; got %v", name, size)
+	} else {
+		return nil
 	}
 }

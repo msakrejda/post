@@ -823,3 +823,11 @@ func TestReceiveParameterStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestReceiveParseComplete(t *testing.T) {
+	s := newProtoStreamContent([]byte{0x0, 0x0, 0x0, 0x4})
+	err := s.ReceiveParseComplete()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+}
