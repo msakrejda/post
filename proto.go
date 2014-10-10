@@ -174,12 +174,7 @@ func (p *ProtoStream) SendSSLRequest() (err error) {
 }
 
 func (p *ProtoStream) SendTerminate() (err error) {
-	_, err = p.str.WriteByte('X')
-	if err != nil {
-		return err
-	}
-	_, err = p.str.WriteInt32(4) // message size
-	return err
+	return p.sendEmpty('X')
 }
 
 func (p *ProtoStream) SendBind(portal string, statement string,
@@ -286,12 +281,7 @@ func (p *ProtoStream) SendCopyData(data []byte) (err error) {
 }
 
 func (p *ProtoStream) SendCopyDone() (err error) {
-	_, err = p.str.WriteByte('c')
-	if err != nil {
-		return err
-	}
-	_, err = p.str.WriteInt32(4)
-	return err
+	return p.sendEmpty('c')
 }
 
 func (p *ProtoStream) SendCopyFail(reason string) (err error) {
@@ -342,12 +332,7 @@ func (p *ProtoStream) SendExecute(portal string, maxRows int32) (err error) {
 }
 
 func (p *ProtoStream) SendFlush() (err error) {
-	_, err = p.str.WriteByte('H')
-	if err != nil {
-		return err
-	}
-	_, err = p.str.WriteInt32(4)
-	return err
+	return p.sendEmpty('H')
 }
 
 func (p *ProtoStream) SendParse(statement, query string, paramTypes []Oid) (err error) {
@@ -408,12 +393,7 @@ func (p *ProtoStream) SendQuery(query string) (err error) {
 }
 
 func (p *ProtoStream) SendSync() (err error) {
-	_, err = p.str.WriteByte('S')
-	if err != nil {
-		return err
-	}
-	_, err = p.str.WriteInt32(4)
-	return err
+	return p.sendEmpty('S')
 }
 
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
@@ -769,4 +749,13 @@ func (p *ProtoStream) receiveEmpty(name string) error {
 	} else {
 		return nil
 	}
+}
+
+func (p *ProtoStream) sendEmpty(code byte) (err error) {
+	_, err = p.str.WriteByte(code)
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4) // message size
+	return err
 }
