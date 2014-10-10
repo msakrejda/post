@@ -407,6 +407,15 @@ func (p *ProtoStream) SendQuery(query string) (err error) {
 	return err
 }
 
+func (p *ProtoStream) SendSync() (err error) {
+	_, err = p.str.WriteByte('S')
+	if err != nil {
+		return err
+	}
+	_, err = p.str.WriteInt32(4)
+	return err
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {

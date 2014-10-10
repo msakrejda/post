@@ -468,6 +468,15 @@ func TestSendQuery(t *testing.T) {
 	}
 }
 
+func TestSendSync(t *testing.T) {
+	s, buf := newProtoStream()
+	err := s.SendSync()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	compareBytes(t, []byte{'S',0x0,0x0,0x0,0x4}, buf.Bytes())
+}
+
 var authRecvTests = []struct {
 	authType AuthResponseType
 	payload  []byte
