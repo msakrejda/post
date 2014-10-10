@@ -97,6 +97,16 @@ const (
 	Error         TransactionStatus = 'E'
 )
 
+type FieldDescription struct {
+	Name       string
+	TableOid   Oid
+	TableAttNo int16
+	TypeOid    Oid
+	TypLen     int16
+	AttTypMod  int32
+	Format     DataFormat
+}
+
 type ProtoStream struct {
 	str  *Stream
 	next byte
@@ -678,6 +688,67 @@ func (p *ProtoStream) ReceiveReadyForQuery() (status TransactionStatus, err erro
 	}
 	st, err := p.str.ReadByte()
 	return TransactionStatus(st), err
+}
+
+func (p *ProtoStream) ReceiveRowDescription() (descs []FieldDescription, err error) {
+	size, err := p.str.ReadInt32()
+	if err != nil {
+		return nil, err
+	}
+	var totRead int32 = 4
+	count, err := p.str.ReadInt16()
+	if err != nil {
+		return nil, err
+	}
+	totRead += 2
+	descs = make([]FieldDescription, count)
+	for i := int16(0); i < count; i++ {
+		desc := &descs[i]
+		desc.Name, err = p.str.ReadCString()
+		if err != nil {
+			return nil, err
+		}
+		totRead += int32(len(desc.Name)) + 1
+		tableOid, err := p.str.ReadInt32()
+		if err != nil {
+			return nil, err
+		}
+		totRead += 4
+		desc.TableOid = Oid(tableOid)
+		desc.TableAttNo, err = p.str.ReadInt16()
+		if err != nil {
+			return nil, err
+		}
+		totRead += 2
+		typ, err := p.str.ReadInt32()
+		if err != nil {
+			return nil, err
+		}
+		totRead += 4
+		desc.TypeOid = Oid(typ)
+		desc.TypLen, err = p.str.ReadInt16()
+		if err != nil {
+			return nil, err
+		}
+		totRead += 2
+		desc.AttTypMod, err = p.str.ReadInt32()
+		if err != nil {
+			return nil, err
+		}
+		totRead += 4
+		format, err := p.str.ReadInt16()
+		if err != nil {
+			return nil, err
+		}
+		desc.Format = DataFormat(format)
+		totRead += 2
+	}
+	if size == totRead {
+		return descs, nil
+	} else {
+		return nil, fmt.Errorf("post: expected %v byte RowDescription; got %v",
+			size, totRead)
+	}
 }
 
 func (p *ProtoStream) receiveEmpty(name string) error {

@@ -899,3 +899,66 @@ func TestReceiveReadyForQuery(t *testing.T) {
 		}
 	}
 }
+
+var rowDescriptionTests = []struct {
+	fields []FieldDescription
+	msgBytes []byte
+}{
+	{[]FieldDescription{}, []byte{0x0,0x0,0x0,0x6,
+		0x0,0x0}},
+	{[]FieldDescription{FieldDescription{"foo",0,0,25,-1,0,TextFormat}},
+		[]byte{0x0,0x0,0x0,0x1c,
+			0x0,0x1,         // field count
+			'f','o','o',0x0, // field 1 name
+			0x0,0x0,0x0,0x0, // field 1 table oid
+			0x0,0x0,         // field 1 attnum
+			0x0,0x0,0x0,0x19, // field 1 data type
+			0xff,0xff, // field 1 typlen
+			0x0,0x0,0x0,0x0, // field 1 typmod
+			0x0,0x0, // field 1 format
+		}},
+}
+
+func TestReceiveRowDescription(t *testing.T) {
+	for i, tt := range rowDescriptionTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		fields, err := s.ReceiveRowDescription()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if len(fields) != len(tt.fields) {
+			t.Errorf("%d: want %v fields; got %v", i, len(tt.fields), len(fields))
+		}
+		for j := 0; j < len(fields); j++ {
+			expected, actual := tt.fields[j], fields[j]
+			if expected.Name != actual.Name {
+				t.Errorf("%d: want field %d Name %v; got %v",
+					i, j, expected.Name, actual.Name)
+			}
+			if expected.TableOid != actual.TableOid {
+				t.Errorf("%d: want field %d TableOid %v; got %v",
+					i, j, expected.TableOid, actual.TableOid)
+			}
+			if expected.TableAttNo != actual.TableAttNo {
+				t.Errorf("%d: want field %d TableAttNo %v; got %v",
+					i, j, expected.TableAttNo, actual.TableAttNo)
+			}
+			if expected.TypeOid != actual.TypeOid {
+				t.Errorf("%d: want field %d TypeOid %v; got %v",
+					i, j, expected.TypeOid, actual.TypeOid)
+			}
+			if expected.TypLen != actual.TypLen {
+				t.Errorf("%d: want field %d TypLen %v; got %v",
+					i, j, expected.TypLen, actual.TypLen)
+			}
+			if expected.AttTypMod != actual.AttTypMod {
+				t.Errorf("%d: want field %d AttTypMod %v; got %v",
+					i, j, expected.AttTypMod, actual.AttTypMod)
+			}
+			if expected.Format != actual.Format {
+				t.Errorf("%d: want field %d Format %v; got %v",
+					i, j, expected.Format, actual.Format)
+			}
+		}
+	}
+}
