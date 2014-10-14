@@ -3,17 +3,35 @@ package post
 import (
 	"bytes"
 	"testing"
+	"net"
+	"time"
 )
 
-type FakeBufferedStreamer struct {
+type FakeConn struct {
 	bytes.Buffer
 }
 
-func (f *FakeBufferedStreamer) Flush() error {
+func (f *FakeConn) LocalAddr() net.Addr {
 	return nil
 }
 
-func (f *FakeBufferedStreamer) Close() error {
+func (f *FakeConn) RemoteAddr() net.Addr {
+	return nil
+}
+
+func (f *FakeConn) Close() error {
+	return nil
+}
+
+func (f *FakeConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (f *FakeConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+func (f *FakeConn) SetDeadline(t time.Time) error {
 	return nil
 }
 
@@ -71,7 +89,7 @@ var bytesTests = []struct {
 
 func TestWriteByte(t *testing.T) {
 	for i, tt := range byteTests {
-		var b FakeBufferedStreamer
+		var b FakeConn
 		s := NewStream(&b)
 		s.WriteByte(tt.value)
 		result := b.Bytes()
@@ -83,7 +101,7 @@ func TestWriteByte(t *testing.T) {
 
 func TestWriteInt16(t *testing.T) {
 	for i, tt := range uint16Tests {
-		var b FakeBufferedStreamer
+		var b FakeConn
 		s := NewStream(&b)
 		s.WriteInt16(tt.value)
 		// N.B.: due to the implementation of
@@ -98,7 +116,7 @@ func TestWriteInt16(t *testing.T) {
 
 func TestWriteInt32(t *testing.T) {
 	for i, tt := range uint32Tests {
-		var b FakeBufferedStreamer
+		var b FakeConn
 		s := NewStream(&b)
 		s.WriteInt32(tt.value)
 		result := b.Bytes()
@@ -110,7 +128,7 @@ func TestWriteInt32(t *testing.T) {
 
 func TestWriteCString(t *testing.T) {
 	for i, tt := range cStringTests {
-		var b FakeBufferedStreamer
+		var b FakeConn
 		s := NewStream(&b)
 		s.WriteCString(tt.value)
 		result := b.Bytes()
@@ -122,7 +140,7 @@ func TestWriteCString(t *testing.T) {
 
 func TestWrite(t *testing.T) {
 	for i, tt := range bytesTests {
-		var b FakeBufferedStreamer
+		var b FakeConn
 		s := NewStream(&b)
 		s.Write(tt.value)
 		result := b.Bytes()
@@ -135,7 +153,7 @@ func TestWrite(t *testing.T) {
 func TestReadByte(t *testing.T) {
 	for i, tt := range byteTests {
 		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeBufferedStreamer{*buf}
+		b := FakeConn{*buf}
 		s := NewStream(&b)
 		result, err := s.ReadByte()
 		if err != nil {
@@ -150,7 +168,7 @@ func TestReadByte(t *testing.T) {
 func TestReadInt16(t *testing.T) {
 	for i, tt := range uint16Tests {
 		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeBufferedStreamer{*buf}
+		b := FakeConn{*buf}
 		s := NewStream(&b)
 		result, err := s.ReadInt16()
 		if err != nil {
@@ -165,7 +183,7 @@ func TestReadInt16(t *testing.T) {
 func TestReadInt32(t *testing.T) {
 	for i, tt := range uint32Tests {
 		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeBufferedStreamer{*buf}
+		b := FakeConn{*buf}
 		s := NewStream(&b)
 		result, err := s.ReadInt32()
 		if err != nil {
@@ -180,7 +198,7 @@ func TestReadInt32(t *testing.T) {
 func TestReadCString(t *testing.T) {
 	for i, tt := range cStringTests {
 		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeBufferedStreamer{*buf}
+		b := FakeConn{*buf}
 		s := NewStream(&b)
 		result, err := s.ReadCString()
 		if err != nil {
@@ -195,7 +213,7 @@ func TestReadCString(t *testing.T) {
 func TestRead(t *testing.T) {
 	for i, tt := range bytesTests {
 		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeBufferedStreamer{*buf}
+		b := FakeConn{*buf}
 		s := NewStream(&b)
 		result := make([]byte, len(tt.bytes))
 		n, err := s.Read(result)

@@ -3,16 +3,11 @@ package post
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
+	"net"
 )
 
-type BufferedStreamer interface {
-	io.ReadWriteCloser
-	Flush() error
-}
-
 type Stream struct {
-	str  BufferedStreamer
+	str  net.Conn
 	buf  [4]byte
 	buf1 []byte
 	buf2 []byte
@@ -21,8 +16,8 @@ type Stream struct {
 
 var be = binary.BigEndian
 
-func NewStream(inner BufferedStreamer) *Stream {
-	var s = Stream{str: inner}
+func NewStream(conn net.Conn) *Stream {
+	var s = Stream{str: conn}
 	s.buf1 = s.buf[0:1]
 	s.buf2 = s.buf[0:2]
 	s.buf4 = s.buf[0:4]

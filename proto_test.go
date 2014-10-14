@@ -77,14 +77,14 @@ func compareOidSliceN(n int, t *testing.T, expected, actual []Oid) {
 }
 
 func newProtoStream() (*ProtoStream, *bytes.Buffer) {
-	b := FakeBufferedStreamer{}
+	b := FakeConn{}
 	s := NewStream(&b)
 	return &ProtoStream{str: s}, &b.Buffer
 }
 
 func newProtoStreamContent(content []byte) *ProtoStream {
 	buf := bytes.NewBuffer(content)
-	b := FakeBufferedStreamer{*buf}
+	b := FakeConn{*buf}
 	s := NewStream(&b)
 	return &ProtoStream{str: s}
 }
