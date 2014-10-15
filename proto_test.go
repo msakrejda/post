@@ -77,14 +77,15 @@ func compareOidSliceN(n int, t *testing.T, expected, actual []Oid) {
 }
 
 func newProtoStream() (*ProtoStream, *bytes.Buffer) {
-	b := FakeConn{}
+	var buf bytes.Buffer
+	b := FakeConn{&buf}
 	s := NewStream(&b)
-	return &ProtoStream{str: s}, &b.Buffer
+	return &ProtoStream{str: s}, &buf
 }
 
 func newProtoStreamContent(content []byte) *ProtoStream {
 	buf := bytes.NewBuffer(content)
-	b := FakeConn{*buf}
+	b := FakeConn{buf}
 	s := NewStream(&b)
 	return &ProtoStream{str: s}
 }
@@ -152,7 +153,11 @@ func TestSendStartupMessage(t *testing.T) {
 		s, buf := newProtoStream()
 		err := s.SendStartupMessage(tt.opts)
 		if err != nil {
-			t.Errorf("want nil err; got %v", err)
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
 		}
 		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
@@ -164,6 +169,10 @@ func TestSendSSLRequest(t *testing.T) {
 	if err != nil {
 		t.Errorf("want nil err; got %v", err)
 	}
+	err = s.Flush()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
 	expected := []byte{0x0, 0x0, 0x0, 0x8, 0x4, 0xd2, 0x16, 0x2f}
 	compareBytes(t, expected, buf.Bytes())
 }
@@ -171,6 +180,10 @@ func TestSendSSLRequest(t *testing.T) {
 func TestSendTerminate(t *testing.T) {
 	s, buf := newProtoStream()
 	err := s.SendTerminate()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	err = s.Flush()
 	if err != nil {
 		t.Errorf("want nil err; got %v", err)
 	}
@@ -234,6 +247,10 @@ func TestSendBind(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
 		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
@@ -266,6 +283,10 @@ func TestSendCancelRequest(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
 		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
@@ -285,6 +306,10 @@ func TestSendClose(t *testing.T) {
 	for i, tt := range closeTests {
 		s, buf := newProtoStream()
 		err := s.SendClose(tt.kind, tt.target)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		err = s.Flush()
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
@@ -308,6 +333,10 @@ func TestSendCopyData(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
 		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
@@ -315,6 +344,10 @@ func TestSendCopyData(t *testing.T) {
 func TestSendCopyDone(t *testing.T) {
 	s, buf := newProtoStream()
 	err := s.SendCopyDone()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	err = s.Flush()
 	if err != nil {
 		t.Errorf("want nil err; got %v", err)
 	}
@@ -337,6 +370,10 @@ func TestSendCopyFail(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
 		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
@@ -356,6 +393,10 @@ func TestSendDescribe(t *testing.T) {
 	for i, tt := range describeTests {
 		s, buf := newProtoStream()
 		err := s.SendDescribe(tt.kind, tt.name)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		err = s.Flush()
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
@@ -385,6 +426,10 @@ func TestSendExecute(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
 		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
@@ -392,6 +437,10 @@ func TestSendExecute(t *testing.T) {
 func TestSendFlush(t *testing.T) {
 	s, buf := newProtoStream()
 	err := s.SendFlush()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	err = s.Flush()
 	if err != nil {
 		t.Errorf("want nil err; got %v", err)
 	}
@@ -426,6 +475,10 @@ func TestSendParse(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
 		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
@@ -442,6 +495,10 @@ func TestSendPasswordMessage(t *testing.T) {
 	for i, tt := range passwordTests {
 		s, buf := newProtoStream()
 		err := s.SendPasswordMessage(tt.password)
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		err = s.Flush()
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
@@ -464,6 +521,10 @@ func TestSendQuery(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
 		compareBytesN(i, t, tt.msgBytes, buf.Bytes())
 	}
 }
@@ -471,6 +532,10 @@ func TestSendQuery(t *testing.T) {
 func TestSendSync(t *testing.T) {
 	s, buf := newProtoStream()
 	err := s.SendSync()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
+	err = s.Flush()
 	if err != nil {
 		t.Errorf("want nil err; got %v", err)
 	}

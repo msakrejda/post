@@ -396,6 +396,10 @@ func (p *ProtoStream) SendSync() (err error) {
 	return p.sendEmpty('S')
 }
 
+func (p *ProtoStream) Flush() error {
+	return p.str.Flush()
+}
+
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {

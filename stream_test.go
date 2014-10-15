@@ -8,7 +8,17 @@ import (
 )
 
 type FakeConn struct {
-	bytes.Buffer
+	*bytes.Buffer
+}
+
+func newFakeConn() *FakeConn {
+	var buf bytes.Buffer
+	return &FakeConn{&buf}
+}
+
+func newFakeConnBytes(data []byte) *FakeConn {
+	buf := bytes.NewBuffer(data)
+	return &FakeConn{buf}
 }
 
 func (f *FakeConn) LocalAddr() net.Addr {
@@ -89,9 +99,19 @@ var bytesTests = []struct {
 
 func TestWriteByte(t *testing.T) {
 	for i, tt := range byteTests {
-		var b FakeConn
-		s := NewStream(&b)
-		s.WriteByte(tt.value)
+		b := newFakeConn()
+		s := NewStream(b)
+		n, err := s.WriteByte(tt.value)
+		if n != 1 {
+			t.Errorf("%d: want 1 byte written; got %d", i, n)
+		}
+		if err != nil {
+			t.Errorf("%d: want nil err on write; got %#v", i, err)
+		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err on flush; got %#v", i, err)
+		}
 		result := b.Bytes()
 		if !bytes.Equal(tt.bytes, result) {
 			t.Errorf("%d: want %#v; got %#v", i, tt.bytes, result)
@@ -101,12 +121,19 @@ func TestWriteByte(t *testing.T) {
 
 func TestWriteInt16(t *testing.T) {
 	for i, tt := range uint16Tests {
-		var b FakeConn
-		s := NewStream(&b)
-		s.WriteInt16(tt.value)
-		// N.B.: due to the implementation of
-		// FakeBufferedStream, we do *not* need to call Flush
-		// before reading the bytes here
+		b := newFakeConn()
+		s := NewStream(b)
+		n, err := s.WriteInt16(tt.value)
+		if n != 2 {
+			t.Errorf("%d: want 2 bytes written; got %d", i, n)
+		}
+		if err != nil {
+			t.Errorf("%d: want nil err on write; got %#v", i, err)
+		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err on flush; got %#v", i, err)
+		}
 		result := b.Bytes()
 		if !bytes.Equal(tt.bytes, result) {
 			t.Errorf("%d: want %#v; got %#v", i, tt.bytes, result)
@@ -116,9 +143,19 @@ func TestWriteInt16(t *testing.T) {
 
 func TestWriteInt32(t *testing.T) {
 	for i, tt := range uint32Tests {
-		var b FakeConn
-		s := NewStream(&b)
-		s.WriteInt32(tt.value)
+		b := newFakeConn()
+		s := NewStream(b)
+		n, err := s.WriteInt32(tt.value)
+		if n != 4 {
+			t.Errorf("%d: want 4 bytes written; got %d", i, n)
+		}
+		if err != nil {
+			t.Errorf("%d: want nil err on write; got %#v", i, err)
+		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err on flush; got %#v", i, err)
+		}
 		result := b.Bytes()
 		if !bytes.Equal(tt.bytes, result) {
 			t.Errorf("%d: want %#v; got %#v", i, tt.bytes, result)
@@ -128,9 +165,19 @@ func TestWriteInt32(t *testing.T) {
 
 func TestWriteCString(t *testing.T) {
 	for i, tt := range cStringTests {
-		var b FakeConn
-		s := NewStream(&b)
-		s.WriteCString(tt.value)
+		b := newFakeConn()
+		s := NewStream(b)
+		n, err := s.WriteCString(tt.value)
+		if expected := len(tt.value) + 1; n != expected {
+			t.Errorf("%d: want %d bytes written; got %d", i, expected, n)
+		}
+		if err != nil {
+			t.Errorf("%d: want nil err on write; got %#v", i, err)
+		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err on flush; got %#v", i, err)
+		}
 		result := b.Bytes()
 		if !bytes.Equal(tt.bytes, result) {
 			t.Errorf("%d: want %#v; got %#v", i, tt.bytes, result)
@@ -140,9 +187,19 @@ func TestWriteCString(t *testing.T) {
 
 func TestWrite(t *testing.T) {
 	for i, tt := range bytesTests {
-		var b FakeConn
-		s := NewStream(&b)
-		s.Write(tt.value)
+		b := newFakeConn()
+		s := NewStream(b)
+		n, err := s.Write(tt.value)
+		if expected := len(tt.value); n != expected {
+			t.Errorf("%d: want %d bytes written; got %d", i, expected, n)
+		}
+		if err != nil {
+			t.Errorf("%d: want nil err on write; got %#v", i, err)
+		}
+		err = s.Flush()
+		if err != nil {
+			t.Errorf("%d: want nil err on flush; got %#v", i, err)
+		}
 		result := b.Bytes()
 		if !bytes.Equal(tt.bytes, result) {
 			t.Errorf("%d: want %#v; got %#v", i, tt.bytes, result)
@@ -152,9 +209,7 @@ func TestWrite(t *testing.T) {
 
 func TestReadByte(t *testing.T) {
 	for i, tt := range byteTests {
-		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeConn{*buf}
-		s := NewStream(&b)
+		s := NewStream(newFakeConnBytes(tt.bytes))
 		result, err := s.ReadByte()
 		if err != nil {
 			t.Errorf("%d: want nil error; got %v", err)
@@ -167,9 +222,7 @@ func TestReadByte(t *testing.T) {
 
 func TestReadInt16(t *testing.T) {
 	for i, tt := range uint16Tests {
-		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeConn{*buf}
-		s := NewStream(&b)
+		s := NewStream(newFakeConnBytes(tt.bytes))
 		result, err := s.ReadInt16()
 		if err != nil {
 			t.Errorf("%d: want nil error; got %v", err)
@@ -182,9 +235,7 @@ func TestReadInt16(t *testing.T) {
 
 func TestReadInt32(t *testing.T) {
 	for i, tt := range uint32Tests {
-		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeConn{*buf}
-		s := NewStream(&b)
+		s := NewStream(newFakeConnBytes(tt.bytes))
 		result, err := s.ReadInt32()
 		if err != nil {
 			t.Errorf("%d: want nil error; got %v", err)
@@ -197,9 +248,7 @@ func TestReadInt32(t *testing.T) {
 
 func TestReadCString(t *testing.T) {
 	for i, tt := range cStringTests {
-		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeConn{*buf}
-		s := NewStream(&b)
+		s := NewStream(newFakeConnBytes(tt.bytes))
 		result, err := s.ReadCString()
 		if err != nil {
 			t.Errorf("%d: want nil error; got %v", err)
@@ -212,9 +261,7 @@ func TestReadCString(t *testing.T) {
 
 func TestRead(t *testing.T) {
 	for i, tt := range bytesTests {
-		buf := bytes.NewBuffer(tt.bytes)
-		b := FakeConn{*buf}
-		s := NewStream(&b)
+		s := NewStream(newFakeConnBytes(tt.bytes))
 		result := make([]byte, len(tt.bytes))
 		n, err := s.Read(result)
 		if err != nil {
