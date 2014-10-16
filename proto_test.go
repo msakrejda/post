@@ -1036,3 +1036,24 @@ func TestReceiveRowDescription(t *testing.T) {
 		}
 	}
 }
+
+var receiveSSLTests = []struct {
+	ssl ServerSSL
+	msgBytes []byte
+}{
+	{'S', []byte{'S'}},
+	{'N', []byte{'N'}},
+}
+
+func TestReceiveSSLResponse(t *testing.T) {
+	for i, tt := range receiveSSLTests {
+		s := newProtoStreamContent(tt.msgBytes)
+		ssl, err := s.ReceiveSSLResponse()
+		if err != nil {
+			t.Errorf("%d: want nil err; got %v", i, err)
+		}
+		if ssl != tt.ssl {
+			t.Errorf("%d: want ssl %v; got %v", i, tt.ssl, ssl)
+		}
+	}
+}

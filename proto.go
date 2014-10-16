@@ -18,6 +18,13 @@ const (
 	AuthenticationGSSContinue       AuthResponseType = 8
 )
 
+type ServerSSL byte
+
+const (
+	SSLAccepted ServerSSL = 'S'
+	SSLRejected ServerSSL = 'N'
+)
+
 type TargetKind byte
 
 const (
@@ -742,6 +749,11 @@ func (p *ProtoStream) ReceiveRowDescription() (descs []FieldDescription, err err
 		return nil, fmt.Errorf("post: expected %v byte RowDescription; got %v",
 			size, totRead)
 	}
+}
+
+func (p *ProtoStream) ReceiveSSLResponse() (ServerSSL, error) {
+	ssl, err := p.str.ReadByte()
+	return ServerSSL(ssl), err
 }
 
 func (p *ProtoStream) receiveEmpty(name string) error {
