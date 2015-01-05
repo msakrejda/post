@@ -5,6 +5,50 @@ import (
 	"io"
 )
 
+type ProtoFailErr struct {
+	want string
+	got string
+}
+
+type PGErr struct {
+	Details map[ErrorField]string
+}
+
+func (e *PGErr) Error() string {
+	fmt.Sprintf("ERROR: %s", e.Details[Error])
+}
+
+type PGNotice struct {
+	Details
+}
+
+func (p *ProtoFailErr) Error() string {
+	return fmt.Sprintf("proto: protocol failure: want %s; got %s", want, got)
+}
+
+func NewProtoErr(want, got string) error {
+	return &ProtoFailErr{want, got}
+}
+
+func NewProtoMessageErr(want string, got byte) error {
+	return &ProtoFailErr{want, fmt.Sprintf("type '%s'")}
+}
+
+const (
+	Authentication  = 'A'
+	ErrorResponse   = 'E'
+	ReadyForQuery   = 'Z'
+	BackendKeyData  = 'K'
+	ParameterStatus = 'S'
+)
+
+type ServerSSL byte
+
+const (
+	SSLAccepted ServerSSL = 'S'
+	SSLRejected ServerSSL = 'N'
+)
+
 type AuthResponseType int32
 
 const (
@@ -18,12 +62,10 @@ const (
 	AuthenticationGSSContinue       AuthResponseType = 8
 )
 
-type ServerSSL byte
-
-const (
-	SSLAccepted ServerSSL = 'S'
-	SSLRejected ServerSSL = 'N'
-)
+type AuthResponse struct {
+	Subtype AuthResponseType
+	Payload []byte
+}
 
 type TargetKind byte
 
@@ -45,11 +87,6 @@ const (
 	CopyText   CopyFormat = 0
 	CopyBinary CopyFormat = 1
 )
-
-type AuthResponse struct {
-	Subtype AuthResponseType
-	Payload []byte
-}
 
 type BackendKeyData struct {
 	Pid       int32
@@ -96,6 +133,30 @@ const (
 	Routine          ErrorField = 'R'
 )
 
+const ErrorFields map[byte]string {
+	'S': "Severity",
+	'C': "Code",
+	'M': "Message",
+	'D': "Detail",
+	'H': "Hint",
+	'P': "Position",
+	'p': "InternalPosition",
+	'q': "InternalQuery",
+	'W': "Where",
+	's': "Schema",
+	't': "Table",
+	'c': "Column",
+	'd': "DataType",
+	'n': "Constraint",
+	'F': "File",
+	'L': "Line",
+	'R': "Routine",
+}
+
+func ErrorCode(code byte) string {
+	return ErrorFields[code]
+}
+
 type TransactionStatus byte
 
 const (
@@ -116,16 +177,38 @@ type FieldDescription struct {
 
 type ProtoStream struct {
 	str  *Stream
+
+	hasNext bool
 	next byte
+	lastErr error
+}
+
+func (p *ProtoStream) Peek() (msgType byte, err error) {
+	if p.hasNext {
+		return p.next, p.lastErr
+	}
+
+	p.next, p.lastErr = p.str.ReadByte()
+	p.hasNext = true
+	return p.next, p.lastErr
 }
 
 // Read the next message type from the stream.
 func (p *ProtoStream) Next() (msgType byte, err error) {
-	p.next, err = p.str.ReadByte()
-	if err != nil {
-		return 0, err
+	if p.hasNext {
+		p.hasNext = false
+		return p.next, p.lastErr
 	}
-	return p.next, nil
+	// N.B.: We do *not* set the hasNext flag, but we do track the
+	// values so we can "unread"
+	p.next, p.lastErr = p.str.ReadByte()
+	return p.next, p.lastErr
+}
+
+func (p *ProtoStream) Unread() {
+	// N.B.: this is not sound since one can "unread" before the
+	// first read, with weird behavior. Don't do that.
+	p.hasNext = true
 }
 
 // Read the next message type from the stream. Panic if it's not the
@@ -516,7 +599,18 @@ func (p *ProtoStream) receiveCopyResponse() (response *CopyResponse, err error) 
 	return &CopyResponse{CopyFormat(format), colFormats}, nil
 }
 
-func (p *ProtoStream) ReceiveDataRow() (data [][]byte, err error) {
+// TODO: this only needs the Read aspects of Stream--extract an
+// interface?
+//
+// N.B.: -1 will be passed for length when the field to decode is null
+// data must not be read in this case.
+type Decode func(colNum int16, data *Stream, length int32) error
+
+// ReceiveDataRow invokes decodeFn for each field in turn with an
+// io.Reader containing the data to be read and an int32 indicating
+// the size of the value. If the field in question is null, the
+// decodeFn will be called with the arguments (nil, -1).
+func (p *ProtoStream) ReceiveDataRow(decodeFn Decode) error {
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -527,21 +621,18 @@ func (p *ProtoStream) ReceiveDataRow() (data [][]byte, err error) {
 		return nil, err
 	}
 	totRead += 2
-	// TODO: avoid allocations here
-	data = make([][]byte, colCount)
-	for i := int16(0); i < colCount; i++ {
+	for colNum := int16(1); colNum <= colCount; colNum++ {
 		fieldSize, err := p.str.ReadInt32()
 		if err != nil {
 			return nil, err
 		}
 		totRead += 4
-		if fieldSize > -1 {
-			data[i] = make([]byte, fieldSize)
-			_, err = io.ReadFull(p.str, data[i])
-			if err != nil {
-				return nil, err
-			}
+		if fieldSize > 0 {
 			totRead += fieldSize
+		}
+		err = decodeFn(colNum, p.str, fieldSize)
+		if err != nil {
+			return err
 		}
 	}
 	if totRead == size {
