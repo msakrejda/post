@@ -46,6 +46,11 @@ type Rows struct {
 	currTag string
 
 	lastErr error
+	lastNulls []bool
+}
+
+type ScanResult struct {
+	
 }
 
 func (r *Rows) Fields() []*FieldDescription {
@@ -103,13 +108,9 @@ func (r *Rows) clear() {
 
 	r.hasRow = false
 	r.lastErr = nil
+	r.lastNulls = nil
 }
 
-// decoders must be instantiated once per connection so that they keep
-// local state without fear of clobbering their internal state details
-// through other concurrent queries. Alternately, if we require the
-// decoders to be pure functions, we don't have to worry about that, but
-// it gets harder to manage both Decode and DecodeInto in parallel
 func (r *Rows) decodeColumn(colNum int16, data *Stream, length int32) (err error) {
 	// track an array of result values and populate it here if
 	// they are nil, or scan into them otherwise to distinguish
@@ -124,19 +125,22 @@ func (r *Rows) decodeColumn(colNum int16, data *Stream, length int32) (err error
 			r.currValues[colIdx], err = nil, nil
 		}
 	} else {
-		err = currDecoder.DecodeInto(currField, data, length, r.currValues[colIdx])
+		if length > -1 {
+			err = currDecoder.DecodeInto(currField, data, length, r.currValues[colIdx])
+		} else {
+			r.lastNulls[colIdx] = true
+		}
 	}
 	return err
 }
 
 func (r *Rows) initialize() {
 	r.clear()
-	// possible messages during init:
-	//   - here we've just submitted a Query message to the backend, so
-	//     we expect it to respond with ErrorResponse,
-	//     CopyInResponse, CopyOutResponse, RowDescription, or EmptyQueryResponse
-	//
-	next, err := r.conn.str.Next()
+	var next byte
+	next, r.lastErr = r.conn.str.nextFiltered()
+	if r.lastErr != nil {
+		return
+	}
 	switch next {
 	case RowDescription:
 		r.currFields, r.lastErr = r.conn.str.ReceiveRowDescription()
@@ -147,10 +151,12 @@ func (r *Rows) initialize() {
 		for i, field := range r.currFields {
 			decoder := r.conn.getDecoder(field)
 			if decoder == nil {
-				return fmt.Errorf("post: could not find decoder for %v", field)
+				r.lastErr = fmt.Errorf("post: could not find decoder for %v", field)
+				return
 			}
 			r.currDecoders[i] = decoder
 		}
+		r.lastNulls = make([]bool, len(r.currFields))
 	case CopyInResponse, CopyOutResponse:
 		r.lastErr = ErrCopy
 	case ErrorResponse:
@@ -165,7 +171,6 @@ func (r *Rows) initialize() {
 }
 
 type Decoder interface {
-	// TODO: also pass in Parameters map?
 	DecodeInto(metadata *FieldDescription, data *Stream, length int32, value interface{}) error
 	Decode(metadata *FieldDescription, data *Stream, length int32) (interface{}, error)
 }
@@ -174,31 +179,35 @@ func (r *Rows) Get() ([]interface{}, error) {
 	if !r.hasRow {
 		return ErrNoRow
 	}
-	r.currValues = make([]interface{}, len(r.currFields))
+	for i in range r.currValues {
+		r.currValues[i] = nil
+	}
 	err := proto.ReceiveDataRow(r.decodeColumn)
 	r.hasRow = false
 	return r.currValues, err
 }
 
-func (r *Rows) Scan(values ...interface{}) error {
+type ScanResult interface {
+	WasNull(value interface{})
+	FirstNull(values ...interface{})
+}
+
+func (r *Rows) Scan(values ...interface{}) (ScanResult, error) {
 	if !r.hasRow {
-		return ErrNoRow
+		return nil, ErrNoRow
 	}
 	if len(values) != len(r.currFields) {
-		return errors.New("post: want %d fields; got %v", len(values), len(r.currFields))
+		return nil, errors.New("post: want %d fields; got %v", len(values), len(r.currFields))
 	}
 	for i, value := range values {
 		if value == nil {
-			return errors.New("post: cannot scan result into nil value at index %d", i)
+			return nil, errors.New("post: want non-nil scan destination at index %d", i)
 		}
 	}
 	r.currValues = values
 	r.hasRow = false
-	return r.conn.str.ReceiveDataRow(r.decodeColumn)
+	return r.lastScanResult, r.conn.str.ReceiveDataRow(r.decodeColumn)
 }
-
-// NULLS: ?
-
 
 type TextDecoder struct {}
 
@@ -208,26 +217,19 @@ func (dec *TextDecoder) Decode(field *FieldDescription, data *Stream,
 }
 
 func (dec *TextDecoder) DecodeInto(field *FieldDescription, data *Stream,
-	length int32, value interface{}) error {
-	var result string, err error
-	if length > -1 {
-		result, err = data.ReadCString()
+	length int32, value interface{}) (err error) {
+	switch result := value.(type) {
+	case string:
+		*result, err = data.ReadCString()
 		if err != nil {
 			return err
 		}
-	}
-
-	switch t := value.(type) {
-	case string:
-		*t = nil
 	default:
 		return errors.New("post: could not scan into type %T", value)
 	}
 }
 
-codecManager.Register(oid.Text, StringTextDecoder{})
-
-
+codecManager.Register(oid.Text, &TextDecoder{})
 
 // rows come with a FieldDescription--Parameters and DataFormat can also affect decoding
 //
@@ -239,20 +241,11 @@ type CodecManager interface {
 	// extra_float_digits always 3, bytea_output always hex
 }
 
-// or just set FieldDescription?
+// or just register by FieldDescription? that gets tricky with typmods et al
 func (cm *CodecManager) Register(fmt DataFormat, typOid Oid, decoder Decoder) error) {
 	// track decoder
 }
 
 func (cm *CodecManager) DecoderFor(field FieldDescription) (Decoder, error) {
 	// return decoder for this field
-}
-
-type StringDecoder struct {
-	//
-	Result string
-}
-
-func (d *StringDecoder) Decode(data io.Reader, length int) error {
-	d.Result = io.ReadString()
 }
