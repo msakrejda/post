@@ -15,15 +15,15 @@ type PGErr struct {
 }
 
 func (e *PGErr) Error() string {
-	fmt.Sprintf("ERROR: %s", e.Details[Error])
+	return fmt.Sprintf("ERROR: %s", e.Details[Message])
 }
 
 type PGNotice struct {
-	Details
+	Details map[ErrorField]string
 }
 
 func (p *ProtoFailErr) Error() string {
-	return fmt.Sprintf("proto: protocol failure: want %s; got %s", want, got)
+	return fmt.Sprintf("proto: protocol failure: want %s; got %s", p.want, p.got)
 }
 
 func NewProtoErr(want, got string) error {
@@ -35,11 +35,19 @@ func NewProtoMessageErr(want string, got byte) error {
 }
 
 const (
-	Authentication  = 'A'
-	ErrorResponse   = 'E'
-	ReadyForQuery   = 'Z'
-	BackendKeyData  = 'K'
-	ParameterStatus = 'S'
+	MsgAuthentication  = 'A'
+	MsgBackendKeyData  = 'K'
+	MsgCommandComplete = 'C'
+	MsgCopyInResponse  = 'G'
+	MsgCopyOutResponse = 'H'
+	MsgDataRow = 'D'
+	MsgEmptyQueryResponse = 'I'
+	MsgErrorResponse   = 'E'
+	MsgNoticeResponse  = 'N'
+	MsgNotificationResponse  = 'A'
+	MsgParameterStatus = 'S'
+	MsgReadyForQuery   = 'Z'
+	MsgRowDescription  = 'T'
 )
 
 type ServerSSL byte
@@ -133,7 +141,7 @@ const (
 	Routine          ErrorField = 'R'
 )
 
-const ErrorFields map[byte]string {
+var ErrorFields map[byte]string = map[byte]string{
 	'S': "Severity",
 	'C': "Code",
 	'M': "Message",
@@ -613,18 +621,18 @@ type Decode func(colNum int16, data *Stream, length int32) error
 func (p *ProtoStream) ReceiveDataRow(decodeFn Decode) error {
 	size, err := p.str.ReadInt32()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var totRead int32 = 4
 	colCount, err := p.str.ReadInt16()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	totRead += 2
 	for colNum := int16(1); colNum <= colCount; colNum++ {
 		fieldSize, err := p.str.ReadInt32()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		totRead += 4
 		if fieldSize > 0 {
@@ -636,9 +644,9 @@ func (p *ProtoStream) ReceiveDataRow(decodeFn Decode) error {
 		}
 	}
 	if totRead == size {
-		return data, nil
+		return nil
 	} else {
-		return nil, fmt.Errorf("post: expected %v byte DataRow; got %v", size, totRead)
+		return fmt.Errorf("post: expected %v byte DataRow; got %v", size, totRead)
 	}
 }
 
@@ -781,7 +789,7 @@ func (p *ProtoStream) ReceiveReadyForQuery() (status TransactionStatus, err erro
 	return TransactionStatus(st), err
 }
 
-func (p *ProtoStream) ReceiveRowDescription() (descs []FieldDescription, err error) {
+func (p *ProtoStream) ReceiveRowDescription() (descs []*FieldDescription, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -792,9 +800,10 @@ func (p *ProtoStream) ReceiveRowDescription() (descs []FieldDescription, err err
 		return nil, err
 	}
 	totRead += 2
-	descs = make([]FieldDescription, count)
+	descs = make([]*FieldDescription, count)
 	for i := int16(0); i < count; i++ {
-		desc := &descs[i]
+		var desc FieldDescription
+		descs[i] = &desc
 		desc.Name, err = p.str.ReadCString()
 		if err != nil {
 			return nil, err

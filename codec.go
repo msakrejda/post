@@ -1,3 +1,5 @@
+package post
+
 // we initialize a Rows object and return it to the user when a user
 // submits a SimpleQuery. At that point the Rows object has control of
 // the protocol stream until it processes a ReadyForQuery, at which
@@ -14,9 +16,6 @@
 
 // TODO: QueryRow / sql.Row interface
 
-// alternately, we could chain multiple query results by having a
-// NextResult()
-
 // interface:
 //
 //   rows.Next() bool
@@ -26,18 +25,26 @@
 //   rows.Get() ([]interface, error)
 //   rows.Scan([]interface) error
 //   rows.Fields() []*FieldDescription
-//
+//   rows.NextResult() bool -- jump to the next result set (since the
+//      simple query protocol can include multiple result sets)
 
-const ErrCopy = errors.New("post: COPY statements are not supported")
-const ErrEmptyQuery = errors.New("post: got empty query")
-const ErrNoRow = errors.New("post: no row available for reading")
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrCopy = errors.New("post: COPY statements are not supported")
+var ErrEmptyQuery = errors.New("post: got empty query")
+var ErrNoRow = errors.New("post: no row available for reading")
 
 type Rows struct {
 	// TODO: maybe we actually want the underlying *ProtoStream
 	// instead? Although handing off undesireable messages like NotificationResponse
 	// would be trickier
 	conn *Conn
+	cm *CodecManager
 	initialized bool
+	query string
 
 	currFields []*FieldDescription
 	currDecoders []Decoder
@@ -47,10 +54,6 @@ type Rows struct {
 
 	lastErr error
 	lastNulls []bool
-}
-
-type ScanResult struct {
-	
 }
 
 func (r *Rows) Fields() []*FieldDescription {
@@ -72,25 +75,29 @@ func (r *Rows) Next() bool {
 
 	// here we need to handle DataRow, CommandComplete, and
 	// ErrorResponse
-	next, r.lastErr := conn.str.Next()
+	var next byte
+	next, r.lastErr = r.conn.nextFiltered()
 	if r.lastErr != nil {
 		return false
 	}
 	switch next {
-	case DataRow:
+	case MsgDataRow:
 		r.hasRow = true
 		return true
-	case CommandComplete:
-		r.currTag, r.lastErr = conn.str.ReceiveCommandComplete()
+	case MsgCommandComplete:
+		r.currTag, r.lastErr = r.conn.str.ReceiveCommandComplete()
 		return false
-	case ErrorResponse:
-		errDetails, err := conn.str.ReceiveErrorResponse()
+	case MsgErrorResponse:
+		errDetails, err := r.conn.str.ReceiveErrorResponse()
 		if err == nil {
 			r.lastErr = &PGErr{Details: errDetails}
+		} else {
+			r.lastErr = err
 		}
 		return false
 	default:
-		return NewProtoMessageErr("DataRow, CommandComplete, or ErrorResponse", next)
+		r.lastErr = NewProtoMessageErr("DataRow, CommandComplete, or ErrorResponse", next)
+		return false
 	}
 }
 
@@ -115,7 +122,7 @@ func (r *Rows) decodeColumn(colNum int16, data *Stream, length int32) (err error
 	// track an array of result values and populate it here if
 	// they are nil, or scan into them otherwise to distinguish
 	// between Decode and DecodeInto
-	colIdx = colNum - 1
+	colIdx := colNum - 1
 	currDecoder := r.currDecoders[colIdx]
 	currField := r.currFields[colIdx]
 	if r.currValues[colIdx] == nil {
@@ -137,19 +144,19 @@ func (r *Rows) decodeColumn(colNum int16, data *Stream, length int32) (err error
 func (r *Rows) initialize() {
 	r.clear()
 	var next byte
-	next, r.lastErr = r.conn.str.nextFiltered()
+	next, r.lastErr = r.conn.nextFiltered()
 	if r.lastErr != nil {
 		return
 	}
 	switch next {
-	case RowDescription:
+	case MsgRowDescription:
 		r.currFields, r.lastErr = r.conn.str.ReceiveRowDescription()
 		if r.lastErr != nil {
 			return
 		}
 		r.currDecoders = make([]Decoder, len(r.currFields))
 		for i, field := range r.currFields {
-			decoder := r.conn.getDecoder(field)
+			decoder := r.cm.DecoderFor(field.Format, field.TypeOid)
 			if decoder == nil {
 				r.lastErr = fmt.Errorf("post: could not find decoder for %v", field)
 				return
@@ -157,14 +164,15 @@ func (r *Rows) initialize() {
 			r.currDecoders[i] = decoder
 		}
 		r.lastNulls = make([]bool, len(r.currFields))
-	case CopyInResponse, CopyOutResponse:
+	case MsgCopyInResponse, MsgCopyOutResponse:
 		r.lastErr = ErrCopy
-	case ErrorResponse:
-		details, r.lastErr := r.c.str.ReceiveErrorResponse()
+	case MsgErrorResponse:
+		var details map[ErrorField]string
+		details, r.lastErr = r.conn.str.ReceiveErrorResponse()
 		if r.lastErr == nil {
 			r.lastErr = &PGErr{details}
 		}
-	case EmptyQueryResponse:
+	case MsgEmptyQueryResponse:
 		r.lastErr = ErrEmptyQuery
 	}
 	r.initialized = true
@@ -177,36 +185,31 @@ type Decoder interface {
 
 func (r *Rows) Get() ([]interface{}, error) {
 	if !r.hasRow {
-		return ErrNoRow
+		return nil, ErrNoRow
 	}
-	for i in range r.currValues {
+	for i := range r.currValues {
 		r.currValues[i] = nil
 	}
-	err := proto.ReceiveDataRow(r.decodeColumn)
+	err := r.conn.str.ReceiveDataRow(r.decodeColumn)
 	r.hasRow = false
 	return r.currValues, err
 }
 
-type ScanResult interface {
-	WasNull(value interface{})
-	FirstNull(values ...interface{})
-}
-
-func (r *Rows) Scan(values ...interface{}) (ScanResult, error) {
+func (r *Rows) Scan(values ...interface{}) (nulls []bool, _ error) {
 	if !r.hasRow {
 		return nil, ErrNoRow
 	}
 	if len(values) != len(r.currFields) {
-		return nil, errors.New("post: want %d fields; got %v", len(values), len(r.currFields))
+		return nil, fmt.Errorf("post: want %d fields; got %v", len(values), len(r.currFields))
 	}
 	for i, value := range values {
 		if value == nil {
-			return nil, errors.New("post: want non-nil scan destination at index %d", i)
+			return nil, fmt.Errorf("post: want non-nil scan destination at index %d", i)
 		}
 	}
 	r.currValues = values
 	r.hasRow = false
-	return r.lastScanResult, r.conn.str.ReceiveDataRow(r.decodeColumn)
+	return r.lastNulls, r.conn.str.ReceiveDataRow(r.decodeColumn)
 }
 
 type TextDecoder struct {}
@@ -219,33 +222,36 @@ func (dec *TextDecoder) Decode(field *FieldDescription, data *Stream,
 func (dec *TextDecoder) DecodeInto(field *FieldDescription, data *Stream,
 	length int32, value interface{}) (err error) {
 	switch result := value.(type) {
-	case string:
+	case *string:
 		*result, err = data.ReadCString()
 		if err != nil {
 			return err
 		}
+		return nil
 	default:
-		return errors.New("post: could not scan into type %T", value)
+		return fmt.Errorf("post: could not scan into type %T", value)
 	}
 }
 
-codecManager.Register(oid.Text, &TextDecoder{})
+// codecManager.Register(oid.Text, &TextDecoder{})
 
 // rows come with a FieldDescription--Parameters and DataFormat can also affect decoding
 //
 // we want either for the driver to decode fields for us, or
 // "scan" it into known data types
 
-type CodecManager interface {
+type CodecManager struct {
 	// client always in utf8, datestyle always fixed,
 	// extra_float_digits always 3, bytea_output always hex
 }
 
 // or just register by FieldDescription? that gets tricky with typmods et al
-func (cm *CodecManager) Register(fmt DataFormat, typOid Oid, decoder Decoder) error) {
+func (cm *CodecManager) Register(fmt DataFormat, typOid Oid, decoder Decoder) error {
 	// track decoder
+	return nil
 }
 
-func (cm *CodecManager) DecoderFor(field FieldDescription) (Decoder, error) {
+func (cm *CodecManager) DecoderFor(fmt DataFormat, typOid Oid) Decoder {
 	// return decoder for this field
+	return nil
 }

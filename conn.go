@@ -2,6 +2,7 @@ package post
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"crypto/tls"
 )
@@ -17,6 +18,8 @@ type Conn struct {
 
 	notifications []*Notification
 	notices []*PGNotice
+
+	currResult *Rows
 }
 
 func NewConn(conn net.Conn) *Conn {
@@ -79,18 +82,18 @@ func (c *Conn) Connect(opts map[string]string, auther Authenticator) error {
 		return err
 	}
 	switch nextType {
-	case Authentication:
+	case MsgAuthentication:
 		auth, err := c.str.ReceiveAuthResponse()
 		if err != nil {
 			return err
 		}
 		return auther.Authenticate(auth, c.str)
-	case ErrorResponse:
+	case MsgErrorResponse:
 		errMap, err := c.str.ReceiveErrorResponse()
 		if err != nil {
 			return err
 		}
-		return NewErrErrorResponse(errMap)
+		return &PGErr{Details: errMap}
 	default:
 		return NewProtoMessageErr("Authentication request or ErrorResponse", nextType)
 	}
@@ -101,24 +104,24 @@ func (c *Conn) Connect(opts map[string]string, auther Authenticator) error {
 			return err
 		}
 		switch nextType {
-		case ParameterStatus:
+		case MsgParameterStatus:
 			err = c.readParameterStatus()
 			if err != nil {
 				return err
 			}
-		case BackendKeyData:
+		case MsgBackendKeyData:
 			err = c.readBackendKeyData()
 			if err != nil {
 				return err
 			}
-		case ReadyForQuery:
+		case MsgReadyForQuery:
 			return c.readReadyForQuery()
-		case ErrorResponse:
+		case MsgErrorResponse:
 			errMap, err := c.str.ReceiveErrorResponse()
 			if err != nil {
 				return err
 			}
-			return NewErrErrorResponse(errMap)
+			return &PGErr{Details: errMap}
 		default:
 			return NewProtoMessageErr("BackendKeyData, ParameterStatus, ReadyForQuery, or ErrorResponse", nextType)
 
@@ -134,11 +137,11 @@ func (c *Conn) nextFiltered() (msgType byte, err error) {
 			return 0, err
 		}
 		switch next {
-		case NoticeResponse:
+		case MsgNoticeResponse:
 			err = c.readNotice()
-		case NotificationResponse:
+		case MsgNotificationResponse:
 			err = c.readNotification()
-		case ParameterStatus:
+		case MsgParameterStatus:
 			err = c.readParameterStatus()
 		default:
 			return next, err
@@ -149,86 +152,17 @@ func (c *Conn) nextFiltered() (msgType byte, err error) {
 	}
 }
 
-type simpleQuery struct {
-	text string
-}
-
-type ResultChain struct {
-	query *simpleQuery
-}
-
-func (rc *ResultChain) Next() *Result {
-	// return the next pending result
-
-	// if only an error was returned by the backend, without even
-	// a RowDescription, return a dummy result that will return an
-	// error immediately so that we can avoid having to return an
-	// error directly from the result chain
-	//
-	// e.g., usage would be:
-	//
-	// chain := conn.SimpleQuery("SELECT 1; SELECT 2")
-	// for result := chain.Next(); result != nil; result = chain.Next() {
-	//         for result.Next() {
-	//                 result.Scan(...)
-	//         }
-	// }
-	//
-	// We may also want to provide a simpler interface--a
-	// ReallySimpleQuery that just returns a ResultSet instead of
-	// a ResultChain, since in most situations, that's all that
-	// matters. This can return an error after the first result
-	// set is processed if there is another one, or simply discard
-	// additional result sets. Alternately, we can do that in the
-	// wrapping user-friendly connection class rather than this
-	// raw, low-level one.
-}
-
-type Result struct {
-	// 
-}
-
-func (r *Result) Fields() []FieldDescription {
-	// read RowDescription if it has not been read yet and return
-	// the field descriptions
-}
-
-func (r *Result) Next() bool {
-	// read RowDescription if it has not been read yet and
-	// see if there is another result. Alternately have Next()
-	// return an error instead of a bool; e.g.,
-	//for err := result.Next(); err == nil; err = result.Next() {}
-}
-
-
-func (r *Result) Scan(args... []interface{}) error {
-	// look up corresponding decoder for each arg?
-}
-
-func (r *Result) Get() ([]interface{}, error) {
-
-}
-
-// the mechanism should support two interfaces:
-//
-//  * a Scan-like one similar to datbase/sql
-//     - ideal for when you know the types you're getting back
-//     - also provide support for scanning into a struct / slice of structs?
-//  * a Get-like to let the driver decide what types to decode to
-//     - return a slice of interfaces?
-
-func (c *Conn) SimpleQuery(query string) (*ResultChain, error) {
+func (c *Conn) SimpleQuery(query string) (*Rows, error) {
 	// submit query, return a resultChain that can process the results
-	if c.currQuery != nil {
+	if c.currResult != nil {
 		return nil, errors.New("post: query in progress")
 	}
 	err := c.str.SendQuery(query)
 	if err != nil {
 		return nil, err
 	}
-	query := &simpleQuery{text: query}
-	c.currResultChain = &ResultChain{query: query}
-	return c.currResultChain, nil
+	c.currResult = &Rows{conn: c, query: query}
+	return c.currResult, nil
 }
 
 type Authenticator interface {
@@ -242,48 +176,51 @@ type DefaultAuthenticator struct {
 
 func (a *DefaultAuthenticator) Authenticate(initialResp *AuthResponse, str *ProtoStream) error {
 	switch initialResp.Subtype {
-	case AuthenticationOK:
+	case AuthenticationOk:
 		return nil
 	case AuthenticationCleartextPassword:
-		_, err = str.SendPasswordMessage(password)
+		err := str.SendPasswordMessage(a.password)
 		if err != nil {
 			return err
 		}
 	case AuthenticationMD5Password:
-		salt = string(initialResp.Payload)
-		_, err = str.SendPasswordMessage(MD5ManglePassword(user, password, salt))
+		salt := string(initialResp.Payload)
+		err := str.SendPasswordMessage(MD5ManglePassword(a.user, a.password, salt))
 		if err != nil {
 			return err
 		}
+	default:
+		return fmt.Errorf("Unsupported authentication subtype %v", initialResp.Subtype)
 	}
-	nextType, err := c.str.Next()
+	nextType, err := str.Next()
 	if err != nil {
 		return err
 	}
 	switch nextType {
-	case Authentication:
-		auth, err := c.str.ReceiveAuthResponse()
+	case MsgAuthentication:
+		auth, err := str.ReceiveAuthResponse()
 		if err != nil {
 			return err
 		}
-		if auth.Subtype == AuthenticationOK {
+		if auth.Subtype == AuthenticationOk  {
 			return nil
 		} else {
-			// TODO: return textual subtype in error
-			return errors.New("proto: expected AuthenticationOK; got %v", auth.Subtype)
+			return fmt.Errorf("proto: expected AuthenticationOK; got %v", auth.Subtype)
 		}
-	case ErrorResponse:
-		errMap, err := c.str.ReceiveErrorResponse()
+	case MsgErrorResponse:
+		errMap, err := str.ReceiveErrorResponse()
 		if err != nil {
 			return err
 		}
-		return NewErrErrorResponse(errMap)
+		return &PGErr{Details: errMap}
+	default:
+		return NewProtoMessageErr("Authentication or ErrorResponse", nextType)
 	}
 }
 
 func (c *Conn) setStream(conn net.Conn) {
 	c.conn = conn
-	c.str = NewProto(NewStream(conn))
+	c.str = &ProtoStream{str: NewStream(conn)}
 }
 
 func (c *Conn) readParameterStatus() error {
@@ -308,7 +245,7 @@ func (c *Conn) readBackendKeyData() error {
 }
 
 func (c *Conn) readNotification() error {
-	notif, err = c.str.ReceiveNotificationResponse()
+	notif, err := c.str.ReceiveNotificationResponse()
 	if err != nil {
 		return err
 	}
@@ -317,16 +254,16 @@ func (c *Conn) readNotification() error {
 }
 
 func (c *Conn) readNotice() error {
-	notice, err = c.str.ReceiveNoticeResponse()
+	notice, err := c.str.ReceiveNoticeResponse()
 	if err != nil {
 		return err
 	}
-	c.notices = append(c.notices, notice)
+	c.notices = append(c.notices, &PGNotice{Details: notice})
 	return nil
 }
 
-func (c *Conn) c.readReadyForQuery() error {
-	status, err := c.ReceiveReadyForQuery()
+func (c *Conn) readReadyForQuery() error {
+	status, err := c.str.ReceiveReadyForQuery()
 	if err != nil {
 		return err
 	}
