@@ -77,6 +77,11 @@ func (c *Conn) Connect(opts map[string]string, auther Authenticator) error {
 	if err != nil {
 		return err
 	}
+	// TODO: flush automatically after some message types?
+	err = c.str.Flush()
+	if err != nil {
+		return err
+	}
 	nextType, err := c.str.Next()
 	if err != nil {
 		return err
@@ -129,6 +134,9 @@ func (c *Conn) Connect(opts map[string]string, auther Authenticator) error {
 	}
 }
 
+func (c *Conn) Close() error {
+	return c.str.SendTerminate()
+}
 
 func (c *Conn) nextFiltered() (msgType byte, err error) {
 	for {

@@ -744,7 +744,7 @@ var dataRowTests = []struct {
 		0x0, 0x0, 0x0, 0xB, // length
 		0x0, 0x1, // field count
 		0x0, 0x0, 0x0, 0x1, // field 1 length
-		0xF, // feild 1 bytes
+		0xF, // field 1 bytes
 	}},
 	{[][]byte{[]byte{0xF, 0x3}, nil, []byte{0x0, 0xA, 0x2}}, []byte{
 		0x0, 0x0, 0x0, 0x17, // length
@@ -757,14 +757,45 @@ var dataRowTests = []struct {
 	}},
 }
 
+type fakeDecoder struct {
+	t *testing.T
+	lastField int16
+	fields [][]byte
+}
+
+func (fd *fakeDecoder) Decode(colNum int16, data *Stream, length int32) error {
+	// N.B.: Here we test the happy path and only use t.Fatal for
+	// error reporting. We should additionally test error
+	// reporting when Decode return an error.
+	fd.lastField += 1
+	if fd.lastField != colNum {
+		fd.t.Fatalf("want callback for column %v; got %v", colNum)
+	}
+	if length >= 0 {
+		result := make([]byte, length)
+		fd.fields = append(fd.fields, result)
+		n, err := io.ReadFull(data, result)
+		if err != nil {
+			fd.t.Fatalf("want nil err reading data for column %v; got %v", colNum, err)
+		}
+		if int32(n) != length {
+			fd.t.Fatalf("want %v bytes read from result; got %v", length, n)
+		}
+	} else {
+		fd.fields = append(fd.fields, nil)
+	}
+	return nil
+}
+
 func TestReceiveDataRow(t *testing.T) {
 	for i, tt := range dataRowTests {
+		decoder := &fakeDecoder{t: t}
 		s := newProtoStreamContent(tt.msgBytes)
-		response, err := s.ReceiveDataRow()
+		err := s.ReceiveDataRow(decoder.Decode)
 		if err != nil {
 			t.Errorf("%d: want nil err; got %v", i, err)
 		}
-		for j, colData := range response {
+		for j, colData := range decoder.fields {
 			compareBytesN(i, t, tt.data[j], colData)
 		}
 	}

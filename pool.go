@@ -1,6 +1,9 @@
 package post
 
 // TODO: sessions and their relationship to pools
+// a pool should basically let you check out a session
+// you should not alter any session state outside of
+// specific
 
 // session factory: go from url and/or parameters to a session
 // session state
@@ -68,6 +71,12 @@ type PGMonitoredSession struct {
 	// Set updates session state and then executes the set on the session
 	// ditto prepare? or just error?
 }
+
+func (s *PGMonitoredSession) OnConnect(func(conn *Conn) error) {
+	// do misc setup, set session variables, make dblink connections, etc.
+	// can be called multiple times
+}
+
 
 // maybe need onConnect / onDisconnect / reconnect handlers?
 

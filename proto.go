@@ -31,11 +31,11 @@ func NewProtoErr(want, got string) error {
 }
 
 func NewProtoMessageErr(want string, got byte) error {
-	return &ProtoFailErr{want, fmt.Sprintf("type '%s'")}
+	return &ProtoFailErr{want, fmt.Sprintf("type '%c'", got)}
 }
 
 const (
-	MsgAuthentication  = 'A'
+	MsgAuthentication  = 'R'
 	MsgBackendKeyData  = 'K'
 	MsgCommandComplete = 'C'
 	MsgCopyInResponse  = 'G'
