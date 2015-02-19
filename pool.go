@@ -168,20 +168,20 @@ type PGRows interface {
 
 
 // type TypeCodec interface {
-// 	Encoder(format DataFormat, oid Oid) (func(interface{}, io.Writer) error)
-// 	Decoder(format DataFormat, oid Oid) (func(io.Reader) (interface{}, error))
+// 	Encoder(format DataFormat, Oid) (func(interface{}, io.Writer) error)
+// 	Decoder(format DataFormat, Oid) (func(io.Reader) (interface{}, error))
 // }
 
 // type DefaultCodec struct {
 //
 // }
 
-// func (c *DefaultCodec) RegisterEncoder(oid Oid, format DataFormat,
+// func (c *DefaultCodec) RegisterEncoder(Oid, format DataFormat,
 // 	encoder func(interface{}, io.Writer) error) {
 // 	c.encoders[format][oid] = encoder
 // }
 
-// func (c *DefaultCodec) RegisterDecoder(oid Oid, format DataFormat,
+// func (c *DefaultCodec) RegisterDecoder(Oid, format DataFormat,
 // 	decoder func(io.Reader) (interface{}, error)) {
 // 	c.encoders[format][oid] = encoder
 // }

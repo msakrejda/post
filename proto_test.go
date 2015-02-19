@@ -2,6 +2,7 @@ package post
 
 import (
 	"bytes"
+	"github.com/uhoh-itsmaciek/post/oid"
 	"io"
 	"testing"
 )
@@ -57,7 +58,7 @@ func compareFormatsN(n int, t *testing.T, expected, actual []DataFormat) {
 	}
 }
 
-func compareOidSliceN(n int, t *testing.T, expected, actual []Oid) {
+func compareOidSliceN(n int, t *testing.T, expected, actual []oid.Oid) {
 	var equal bool
 	if len(expected) == len(actual) {
 		equal = true
@@ -450,16 +451,16 @@ func TestSendFlush(t *testing.T) {
 var parseTests = []struct {
 	statement string
 	query string
-	paramTypes []Oid
+	paramTypes []oid.Oid
 	msgBytes []byte
 
 }{
-	{"", "SELECT 1", []Oid{}, []byte{'P',
+	{"", "SELECT 1", []oid.Oid{}, []byte{'P',
 		0x0,0x0,0x0,0x10,
 		0x0,
 		'S','E','L','E','C','T',' ','1', 0x0,
 		0x0, 0x0}},
-	{"steve", "SELECT $1 + $2", []Oid{Oid(20),Oid(23)}, []byte{'P',
+	{"steve", "SELECT $1 + $2", []oid.Oid{oid.Oid(20),oid.Oid(23)}, []byte{'P',
 		0x0,0x0,0x0,0x23,
 		's','t','e','v','e',0x0,
 		'S','E','L','E','C','T',' ','$','1',' ','+',' ','$','2',0x0,
@@ -908,17 +909,17 @@ func TestReceiveNotificationResponse(t *testing.T) {
 }
 
 var parameterDescriptionTests = []struct {
-	oids []Oid
+	oids []oid.Oid
 	msgBytes []byte
 }{
-	{[]Oid{}, []byte{0x0,0x0,0x0,0x6,
+	{[]oid.Oid{}, []byte{0x0,0x0,0x0,0x6,
 		0x0,0x0,
 	}},
-	{[]Oid{3}, []byte{0x0,0x0,0x0,0xA,
+	{[]oid.Oid{3}, []byte{0x0,0x0,0x0,0xA,
 		0x0,0x1,
 		0x0,0x0,0x0,0x3,
 	}},
-	{[]Oid{3,2}, []byte{0x0,0x0,0x0,0xE,
+	{[]oid.Oid{3,2}, []byte{0x0,0x0,0x0,0xE,
 		0x0,0x2,
 		0x0,0x0,0x0,0x3,
 		0x0,0x0,0x0,0x2,

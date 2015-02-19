@@ -3,6 +3,7 @@ package post
 import (
 	"fmt"
 	"io"
+	"github.com/uhoh-itsmaciek/post/oid"
 )
 
 type ProtoFailErr struct {
@@ -117,8 +118,6 @@ type ParameterStatus struct {
 	Value string
 }
 
-type Oid uint32
-
 type ErrorField byte
 
 const (
@@ -175,9 +174,9 @@ const (
 
 type FieldDescription struct {
 	Name       string
-	TableOid   Oid
+	TableOid   oid.Oid
 	TableAttNo int16
-	TypeOid    Oid
+	TypeOid    oid.Oid
 	TypLen     int16
 	AttTypMod  int32
 	Format     DataFormat
@@ -433,7 +432,7 @@ func (p *ProtoStream) SendFlush() (err error) {
 	return p.sendEmpty('H')
 }
 
-func (p *ProtoStream) SendParse(statement, query string, paramTypes []Oid) (err error) {
+func (p *ProtoStream) SendParse(statement, query string, paramTypes []oid.Oid) (err error) {
 	_, err = p.str.WriteByte('P')
 	if err != nil {
 		return err
@@ -718,7 +717,7 @@ func (p *ProtoStream) ReceiveNotificationResponse() (notif *Notification, err er
 	}
 }
 
-func (p *ProtoStream) ReceiveParameterDescription() (desc []Oid, err error) {
+func (p *ProtoStream) ReceiveParameterDescription() (desc []oid.Oid, err error) {
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -729,13 +728,13 @@ func (p *ProtoStream) ReceiveParameterDescription() (desc []Oid, err error) {
 		return nil, err
 	}
 	totRead += 2
-	desc = make([]Oid, count)
+	desc = make([]oid.Oid, count)
 	for i := int16(0); i < count; i++ {
 		param, err := p.str.ReadInt32()
 		if err != nil {
 			return nil, err
 		}
-		desc[i] = Oid(param)
+		desc[i] = oid.Oid(param)
 		totRead += 4
 	}
 	if size == totRead {
@@ -814,7 +813,7 @@ func (p *ProtoStream) ReceiveRowDescription() (descs []*FieldDescription, err er
 			return nil, err
 		}
 		totRead += 4
-		desc.TableOid = Oid(tableOid)
+		desc.TableOid = oid.Oid(tableOid)
 		desc.TableAttNo, err = p.str.ReadInt16()
 		if err != nil {
 			return nil, err
@@ -825,7 +824,7 @@ func (p *ProtoStream) ReceiveRowDescription() (descs []*FieldDescription, err er
 			return nil, err
 		}
 		totRead += 4
-		desc.TypeOid = Oid(typ)
+		desc.TypeOid = oid.Oid(typ)
 		desc.TypLen, err = p.str.ReadInt16()
 		if err != nil {
 			return nil, err

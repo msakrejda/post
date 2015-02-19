@@ -31,6 +31,7 @@ package post
 import (
 	"errors"
 	"fmt"
+	"github.com/uhoh-itsmaciek/post/oid"
 )
 
 var ErrCopy = errors.New("post: COPY statements are not supported")
@@ -241,17 +242,23 @@ func (dec *TextDecoder) DecodeInto(field *FieldDescription, data *Stream,
 // "scan" it into known data types
 
 type CodecManager struct {
+	codecs map[DataFormat](map[oid.Oid]Decoder)
 	// client always in utf8, datestyle always fixed,
 	// extra_float_digits always 3, bytea_output always hex
 }
 
-// or just register by FieldDescription? that gets tricky with typmods et al
-func (cm *CodecManager) Register(fmt DataFormat, typOid Oid, decoder Decoder) error {
-	// track decoder
-	return nil
+func NewCodecManager() *CodecManager {
+	formatMap := make(map[DataFormat](map[oid.Oid]Decoder))
+	formatMap[TextFormat] = make(map[oid.Oid]Decoder)
+	formatMap[BinaryFormat] = make(map[oid.Oid]Decoder)
+	return &CodecManager{formatMap}
 }
 
-func (cm *CodecManager) DecoderFor(fmt DataFormat, typOid Oid) Decoder {
-	// return decoder for this field
-	return nil
+// or just register by FieldDescription? that gets tricky with typmods et al
+func (cm *CodecManager) Register(fmt DataFormat, typOid oid.Oid, decoder Decoder) {
+	cm.codecs[fmt][typOid] = decoder
+}
+
+func (cm *CodecManager) DecoderFor(fmt DataFormat, typOid oid.Oid) Decoder {
+	return cm.codecs[fmt][typOid]
 }

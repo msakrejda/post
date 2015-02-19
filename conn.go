@@ -9,6 +9,7 @@ import (
 
 type Conn struct {
 	conn net.Conn
+	cm *CodecManager
  	str *ProtoStream
 
  	params map[string]string
@@ -22,8 +23,8 @@ type Conn struct {
 	currResult *Rows
 }
 
-func NewConn(conn net.Conn) *Conn {
-	c := &Conn{params: make(map[string]string)}
+func NewConn(conn net.Conn, cm *CodecManager) *Conn {
+	c := &Conn{params: make(map[string]string), cm: cm}
 	c.setStream(conn)
 	return c
 }
@@ -77,7 +78,9 @@ func (c *Conn) Connect(opts map[string]string, auther Authenticator) error {
 	if err != nil {
 		return err
 	}
-	// TODO: flush automatically after some message types?
+	// TODO: flush automatically after some message types? or
+	// flush implicitly when Next() is called if the stream has
+	// not been flushed yet?
 	err = c.str.Flush()
 	if err != nil {
 		return err
@@ -92,7 +95,10 @@ func (c *Conn) Connect(opts map[string]string, auther Authenticator) error {
 		if err != nil {
 			return err
 		}
-		return auther.Authenticate(auth, c.str)
+		err = auther.Authenticate(auth, c.str)
+		if err != nil {
+			return err
+		}
 	case MsgErrorResponse:
 		errMap, err := c.str.ReceiveErrorResponse()
 		if err != nil {
@@ -161,7 +167,7 @@ func (c *Conn) nextFiltered() (msgType byte, err error) {
 }
 
 func (c *Conn) SimpleQuery(query string) (*Rows, error) {
-	// submit query, return a resultChain that can process the results
+	// submit query, return a Rows object that can process the result
 	if c.currResult != nil {
 		return nil, errors.New("post: query in progress")
 	}
@@ -169,7 +175,11 @@ func (c *Conn) SimpleQuery(query string) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.currResult = &Rows{conn: c, query: query}
+	err = c.str.Flush()
+	if err != nil {
+		return nil, err
+	}
+	c.currResult = &Rows{conn: c, cm: c.cm, query: query}
 	return c.currResult, nil
 }
 
@@ -191,9 +201,17 @@ func (a *DefaultAuthenticator) Authenticate(initialResp *AuthResponse, str *Prot
 		if err != nil {
 			return err
 		}
+		err = str.Flush()
+		if err != nil {
+			return err
+		}
 	case AuthenticationMD5Password:
 		salt := string(initialResp.Payload)
 		err := str.SendPasswordMessage(MD5ManglePassword(a.user, a.password, salt))
+		if err != nil {
+			return err
+		}
+		err = str.Flush()
 		if err != nil {
 			return err
 		}
