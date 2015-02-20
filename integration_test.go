@@ -55,6 +55,13 @@ func TestQueryFields(t *testing.T) {
 	if fieldCount := len(fields); fieldCount != 1 {
 		t.Fatalf("want 1 field; got %v", fieldCount)
 	}
+	field := fields[0]
+	if field.Name != "greeting" {
+		t.Errorf("want field 1 name 'greeting'; got %v", field.Name)
+	}
+	if field.TypeOid != oid.Unknown {
+		t.Errorf("want field 1 type oid.Unknown; got %v", field.TypeOid)
+	}
 	// TODO: close the rows object
 }
 
