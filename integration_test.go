@@ -102,6 +102,9 @@ func TestQueryScanOneRow(t *testing.T) {
 	}
 	var result string
 	rows.Scan(&result)
+	if result != "hello world" {
+		t.Errorf("want result 'hello world'; got %v", result)
+	}
 	if rows.Next() {
 		t.Fatal("want one row; got at least two")
 	}

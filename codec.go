@@ -3,6 +3,7 @@ package post
 import (
 	"fmt"
 	"github.com/uhoh-itsmaciek/post/oid"
+	"io"
 )
 
 type Decoder interface {
@@ -14,18 +15,19 @@ type TextDecoder struct {}
 
 func (dec *TextDecoder) Decode(field *FieldDescription, data *Stream,
 	length int32) (value interface{}, err error) {
-	return data.ReadCString()
+	result := make([]byte, length)
+	_, err = io.ReadAtLeast(data, result, int(length))
+	return string(result), err
 }
 
 func (dec *TextDecoder) DecodeInto(field *FieldDescription, data *Stream,
 	length int32, value interface{}) (err error) {
 	switch result := value.(type) {
 	case *string:
-		*result, err = data.ReadCString()
-		if err != nil {
-			return err
-		}
-		return nil
+		resultBytes := make([]byte, length)
+		_, err = io.ReadAtLeast(data, resultBytes, int(length))
+		*result = string(resultBytes)
+		return err
 	default:
 		return fmt.Errorf("post: could not scan into type %T", value)
 	}
