@@ -19,8 +19,12 @@ package post
 // interface:
 //
 //   rows.Next() bool
-//   rows.Close() error -- called automagically if Next() returns false
-//     but may be used to close the result set early
+//   rows.Close() error -- note that unlike database/sql.Rows, this
+//     must be called even if rows.Next() returns false, signaling
+//     end of iteration: this is because we may have multiple result
+//     sets (and while it would be possible to account for this and
+//     avoid it in the simple result, the additional complexity is
+//     not worth it in this low-level API)
 //   rows.Err() error
 //   rows.Get() ([]interface, error)
 //   rows.Scan([]interface) error
@@ -72,25 +76,36 @@ func (r *Rows) Fields() []*FieldDescription {
 func (r *Rows) Next() bool {
 	if !r.initialized {
 		r.initialize()
-		if !r.initialized {
-			// something went wrong with initialize;
-			// caller should inspect rows.Err()
+	}
+	if r.lastErr != nil {
+		return false
+	}
+
+	if r.hasRow {
+		r.lastErr = r.conn.str.ReceiveDataRow(r.discardColumn)
+		r.hasRow = false
+		if r.lastErr != nil {
 			return false
 		}
 	}
 
+	if r.currTag != "" {
+		// This indicates that we've reached the end of a
+		// (single) result set; we want to avoid reading
+		// anything else until NextResult() is called
+		return false
+	}
+
 	var next byte
-	next, r.lastErr = r.conn.nextFiltered()
+	next, r.lastErr = r.conn.peekFiltered()
 	if r.lastErr != nil {
 		return false
 	}
 	switch next {
 	case MsgDataRow:
 		r.hasRow = true
-		return true
 	case MsgCommandComplete:
 		r.currTag, r.lastErr = r.conn.str.ReceiveCommandComplete()
-		return false
 	case MsgErrorResponse:
 		errDetails, err := r.conn.str.ReceiveErrorResponse()
 		if err == nil {
@@ -98,11 +113,34 @@ func (r *Rows) Next() bool {
 		} else {
 			r.lastErr = err
 		}
-		return false
 	default:
-		r.lastErr = NewProtoMessageErr("DataRow, CommandComplete, or ErrorResponse", next)
-		return false
+		r.lastErr = fmt.Errorf("post: protocol error: unexpected message type: %c", next)
 	}
+	return r.hasRow
+}
+
+func (r *Rows) NextResult() bool {
+	for r.Next() {}
+	r.initialize()
+	// FIXME: right now, "initialized" means "there are rows ready
+	// for Next() to do its thing". That's pretty bogus (there
+	// could be empty result sets or errors) but we'll handle it
+	// later.
+	return r.initialized
+}
+
+// Close cleans up the Rows object and returns any pending errors. If
+// Close is called explicitly, there's no need to call Err; the error
+// returned from that, if any, will be returned here. Note that if
+// there are multiple result sets, this discards any pending ones.
+func (r *Rows) Close() error {
+	for r.NextResult() {}
+	if r.lastErr != nil {
+		return r.lastErr
+	}
+	r.clear()
+	r.lastErr = r.conn.CloseSimpleQuery(r)
+	return r.lastErr
 }
 
 func (r *Rows) Err() error {
@@ -145,10 +183,22 @@ func (r *Rows) decodeColumn(colNum int16, data *Stream, length int32) (err error
 	return err
 }
 
+func (r *Rows) discardColumn(colNum int16, data *Stream, length int32) (err error) {
+	if length > -1 {
+		_, err = io.CopyN(ioutil.Discard, data, int64(length))
+	}
+	return err
+}
+
+// Initialize the Rows for reading the next set of results (note that
+// a single query may produce multiple sets of results).
+
+// check to see if we have a RowDescription to process; if so, do so
+// and set up decoders
 func (r *Rows) initialize() {
 	r.clear()
 	var next byte
-	next, r.lastErr = r.conn.nextFiltered()
+	next, r.lastErr = r.conn.peekFiltered()
 	if r.lastErr != nil {
 		return
 	}
@@ -168,50 +218,12 @@ func (r *Rows) initialize() {
 			r.currDecoders[i] = decoder
 		}
 		r.lastNulls = make([]bool, len(r.currFields))
+		r.initialized = true
 	case MsgCopyInResponse, MsgCopyOutResponse:
 		r.lastErr = ErrCopy
-	case MsgErrorResponse:
-		var details map[ErrorField]string
-		details, r.lastErr = r.conn.str.ReceiveErrorResponse()
-		if r.lastErr == nil {
-			r.lastErr = &PGErr{details}
-		}
 	case MsgEmptyQueryResponse:
 		r.lastErr = ErrEmptyQuery
 	}
-	r.initialized = true
-}
-
-func (r *Rows) discardUntilCommandComplete() {
-	if !r.initialized {
-		// technically, we could just fast-track initialization in
-		// this case, but it's probably not worth it
-		r.initialize()
-		if !r.initialized {
-			return
-		}
-	}
-
-	for {
-		var next byte
-		next, r.lastErr = r.conn.nextFiltered()
-		if r.lastErr != nil {
-			return
-		}
-		switch next {
-		case MsgDataRow:
-			// TODO: f
-			r.lastErr = r.conn.str.ReceiveDataRow(r.decodeColumn)
-			if r.lastErr != nil {
-				return
-			}
-		}
-	}
-}
-
-func (r *Rows) discardColumn(colNum int16, data *Stream, length int32) (err error) {
-	_, err = io.CopyN(ioutil.Discard, data, int64(length))
-	return err
 }
 
 func (r *Rows) Get() ([]interface{}, error) {
@@ -221,7 +233,8 @@ func (r *Rows) Get() ([]interface{}, error) {
 	for i := range r.currValues {
 		r.currValues[i] = nil
 	}
-	// TODO: should this error set lastErr? check db/sql
+	// N.B.: this does *not* set lastErr
+	// TODO: verify this behavior against database/sql
 	err := r.conn.str.ReceiveDataRow(r.decodeColumn)
 	r.hasRow = false
 	return r.currValues, err
@@ -242,5 +255,6 @@ func (r *Rows) Scan(values ...interface{}) (nulls []bool, _ error) {
 	}
 	r.currValues = values
 	r.hasRow = false
+	// TODO: should this error set lastErr? check db/sql
 	return r.lastNulls, r.conn.str.ReceiveDataRow(r.decodeColumn)
 }

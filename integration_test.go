@@ -1,7 +1,6 @@
 package post
 
 import (
-	"fmt"
 	"net"
 	"testing"
 	"github.com/uhoh-itsmaciek/post/oid"
@@ -15,6 +14,9 @@ func connect(t *testing.T) *Conn {
 	cm := NewCodecManager()
 	cm.Register(TextFormat, oid.Text, &TextDecoder{})
 	cm.Register(TextFormat, oid.Unknown, &TextDecoder{})
+	cm.Register(TextFormat, oid.Int2, &TextDecoder{})
+	cm.Register(TextFormat, oid.Int4, &TextDecoder{})
+	cm.Register(TextFormat, oid.Int8, &TextDecoder{})
 	conn := NewConn(c, cm)
 	err = conn.Connect(map[string]string{"user": "maciek"}, &DefaultAuthenticator{"maciek", ""})
 	if err != nil {
@@ -23,30 +25,49 @@ func connect(t *testing.T) *Conn {
 	return conn
 }
 
-func TestConnect(t *testing.T) {
-	conn := connect(t)
-	err := conn.Close()
+func ensureValidAndClose(t *testing.T, conn *Conn) {
+	rows, err := conn.SimpleQuery("select 1")
+	defer func() {
+		if err = conn.Close(); err != nil {
+			t.Fatalf("want nil err; got %v", err)
+		}
+	}()
+	if err != nil {
+		t.Fatalf("want nil err; got %v", err)
+	}
+	if !rows.Next() {
+		t.Error("want one row; got none")
+	}
+	err = rows.Close()
 	if err != nil {
 		t.Errorf("want nil err; got %v", err)
 	}
 }
 
+func TestConnect(t *testing.T) {
+	conn := connect(t)
+	ensureValidAndClose(t, conn)
+}
+
 func TestQueryZeroRows(t *testing.T) {
 	conn := connect(t)
-	defer conn.Close()
+	defer ensureValidAndClose(t, conn)
 	rows, err := conn.SimpleQuery("SELECT 1 WHERE false")
 	if err != nil {
 		t.Fatalf("want nil err; got %v", err)
 	}
-	// TODO: close the rows object
 	if rows.Next() {
 		t.Fatal("want zero rows; got at least one")
+	}
+	err = rows.Close()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
 	}
 }
 
 func TestQueryFields(t *testing.T) {
 	conn := connect(t)
-	defer conn.Close()
+	defer ensureValidAndClose(t, conn)
 	rows, err := conn.SimpleQuery("SELECT 'hello world' AS greeting")
 	if err != nil {
 		t.Fatalf("want nil err; got %v", err)
@@ -62,25 +83,31 @@ func TestQueryFields(t *testing.T) {
 	if field.TypeOid != oid.Unknown {
 		t.Errorf("want field 1 type oid.Unknown; got %v", field.TypeOid)
 	}
-	// TODO: close the rows object
+	err = rows.Close()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
+	}
 }
 
 func TestQueryScanOneRow(t *testing.T) {
 	conn := connect(t)
-	defer conn.Close()
+	defer ensureValidAndClose(t, conn)
 	rows, err := conn.SimpleQuery("SELECT 'hello world' AS greeting")
 	if err != nil {
 		t.Fatalf("want nil err; got %v", err)
 	}
-	// TODO: close the rows object
 	if !rows.Next() {
-		fmt.Println(rows.Err())
+		t.Errorf("want nil rows.Err(); got %v", rows.Err())
 		t.Fatal("want one row; got none")
 	}
-	var result int
+	var result string
 	rows.Scan(&result)
 	if rows.Next() {
 		t.Fatal("want one row; got at least two")
+	}
+	err = rows.Close()
+	if err != nil {
+		t.Errorf("want nil err; got %v", err)
 	}
 }
 
@@ -92,12 +119,12 @@ func TestQueryTwoResultSets(t *testing.T) {
 
 }
 
-func TestQueryTwice(t *testing.T) {
-	// ensure that protocol state is re-established correctly after a query
-}
-
 func TestQueryCloseEarly(t *testing.T) {
 	// ensure that protocol state is re-established correctly if the result
 	// row object is closed early
 }
 
+func TestQueryTwoResultsCloseEarly(t *testing.T) {
+	// ensure that protocol state is re-established correctly if there are
+	// multiple result objects and the row object is closed early
+}

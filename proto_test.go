@@ -92,11 +92,6 @@ func newProtoStreamContent(content []byte) *ProtoStream {
 }
 
 func TestExpectExpected(t *testing.T) {
-	defer func() {
-		if err := recover(); err != nil {
-			t.Errorf("want no panic; got %v", err)
-		}
-	}()
 	s := newProtoStreamContent([]byte{'x'})
 	err := s.Expect('x')
 	if err != nil {
@@ -113,13 +108,11 @@ func TestExpectError(t *testing.T) {
 }
 
 func TestExpectUnexpected(t *testing.T) {
-	defer func() {
-		if err := recover(); err == nil {
-			t.Error("want panic; got nil")
-		}
-	}()
 	s := newProtoStreamContent([]byte{'x'})
-	s.Expect('y')
+	err := s.Expect('y')
+	if err == nil {
+		t.Error("want error; got nil")
+	}
 }
 
 func TextNext(t *testing.T) {

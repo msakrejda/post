@@ -144,9 +144,9 @@ func (c *Conn) Close() error {
 	return c.str.SendTerminate()
 }
 
-func (c *Conn) nextFiltered() (msgType byte, err error) {
+func (c *Conn) peekFiltered() (msgType byte, err error) {
 	for {
-		next, err := c.str.Next()
+		next, err := c.str.Peek()
 		if err != nil {
 			return 0, err
 		}
@@ -181,6 +181,22 @@ func (c *Conn) SimpleQuery(query string) (*Rows, error) {
 	}
 	c.currResult = &Rows{conn: c, cm: c.cm, query: query}
 	return c.currResult, nil
+}
+
+func (c *Conn) CloseSimpleQuery(rows *Rows) error {
+	if c.currResult != rows {
+		return fmt.Errorf("post: expected open result %v; got %v", c.currResult, rows)
+	}
+	c.currResult = nil
+	// FIXME: technically, calling RFQ is a little bogus, since if
+	// the conn fails right *after* the query completes, the
+	// attempt to read the RFQ here can incorrectly ascribe that
+	// error to the query.
+	err := c.str.Expect(MsgReadyForQuery)
+	if err != nil {
+		return err
+	}
+	return c.readReadyForQuery()
 }
 
 type Authenticator interface {
@@ -289,6 +305,7 @@ func (c *Conn) readNotice() error {
 }
 
 func (c *Conn) readReadyForQuery() error {
+	c.currResult = nil
 	status, err := c.str.ReceiveReadyForQuery()
 	if err != nil {
 		return err

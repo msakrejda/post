@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"io"
 	"github.com/uhoh-itsmaciek/post/oid"
+	"log"
 )
+
+const debug bool = false
 
 type ProtoFailErr struct {
 	want string
@@ -190,6 +193,7 @@ type ProtoStream struct {
 	lastErr error
 }
 
+// Look at the next message type from the stream without consuming it.
 func (p *ProtoStream) Peek() (msgType byte, err error) {
 	if p.hasNext {
 		return p.next, p.lastErr
@@ -206,33 +210,26 @@ func (p *ProtoStream) Next() (msgType byte, err error) {
 		p.hasNext = false
 		return p.next, p.lastErr
 	}
-	// N.B.: We do *not* set the hasNext flag, but we do track the
-	// values so we can "unread"
 	p.next, p.lastErr = p.str.ReadByte()
 	return p.next, p.lastErr
 }
 
-func (p *ProtoStream) Unread() {
-	// N.B.: this is not sound since one can "unread" before the
-	// first read, with weird behavior. Don't do that.
-	p.hasNext = true
-}
-
-// Read the next message type from the stream. Panic if it's not the
-// expected message type.
+// Read the next message type from the stream. Return an error if it
+// could not be read or is not the expected type.
 func (p *ProtoStream) Expect(expected byte) (err error) {
-	p.next, err = p.str.ReadByte()
+	next, err := p.Next()
 	if err != nil {
 		return err
 	}
-	if p.next != expected {
-		panic(fmt.Sprintf("expected message type %v; got %v",
-			expected, p.next))
+	if next != expected {
+		return fmt.Errorf("post: expected message type %c; got %c",
+			expected, next)
 	}
 	return nil
 }
 
 func (p *ProtoStream) SendStartupMessage(params map[string]string) (err error) {
+	if debug { log.Println("> StartupMessage") }
 	var msgSize int32 = 4 /* size itself */ + 4 /* protocol header */
 	for key, val := range params {
 		msgSize += int32(len(key)) + 1 + int32(len(val)) + 1
@@ -262,6 +259,7 @@ func (p *ProtoStream) SendStartupMessage(params map[string]string) (err error) {
 }
 
 func (p *ProtoStream) SendSSLRequest() (err error) {
+	if debug { log.Println("> SSLRequest") }
 	_, err = p.str.WriteInt32(8)
 	if err != nil {
 		return err
@@ -271,11 +269,13 @@ func (p *ProtoStream) SendSSLRequest() (err error) {
 }
 
 func (p *ProtoStream) SendTerminate() (err error) {
+	if debug { log.Println("> Terminate") }
 	return p.sendEmpty('X')
 }
 
 func (p *ProtoStream) SendBind(portal string, statement string,
 	formats []int16, params [][]byte, resultFormats []int16) (err error) {
+	if debug { log.Println("> Bind") }
 	_, err = p.str.WriteByte('B')
 	if err != nil {
 		return err
@@ -334,6 +334,7 @@ func (p *ProtoStream) SendBind(portal string, statement string,
 }
 
 func (p *ProtoStream) SendCancelRequest(pid, secretKey int32) (err error) {
+	if debug { log.Println("> CancelRequest") }
 	_, err = p.str.WriteInt32(16)
 	if err != nil {
 		return err
@@ -351,6 +352,7 @@ func (p *ProtoStream) SendCancelRequest(pid, secretKey int32) (err error) {
 }
 
 func (p *ProtoStream) SendClose(targetType TargetKind, target string) (err error) {
+	if debug { log.Println("> Close") }
 	msgSize := int32(4 + 1 + len(target) + 1)
 	_, err = p.str.WriteInt32(msgSize)
 	if err != nil {
@@ -365,6 +367,7 @@ func (p *ProtoStream) SendClose(targetType TargetKind, target string) (err error
 }
 
 func (p *ProtoStream) SendCopyData(data []byte) (err error) {
+	if debug { log.Println("> CopyData") }
 	_, err = p.str.WriteByte('d')
 	if err != nil {
 		return err
@@ -378,10 +381,12 @@ func (p *ProtoStream) SendCopyData(data []byte) (err error) {
 }
 
 func (p *ProtoStream) SendCopyDone() (err error) {
+	if debug { log.Println("> CopyDone") }
 	return p.sendEmpty('c')
 }
 
 func (p *ProtoStream) SendCopyFail(reason string) (err error) {
+	if debug { log.Println("> CopyFail") }
 	_, err = p.str.WriteByte('f')
 	if err != nil {
 		return err
@@ -395,6 +400,7 @@ func (p *ProtoStream) SendCopyFail(reason string) (err error) {
 }
 
 func (p *ProtoStream) SendDescribe(kind TargetKind, name string) (err error) {
+	if debug { log.Println("> Describe") }
 	_, err = p.str.WriteByte('D')
 	if err != nil {
 		return err
@@ -412,6 +418,7 @@ func (p *ProtoStream) SendDescribe(kind TargetKind, name string) (err error) {
 }
 
 func (p *ProtoStream) SendExecute(portal string, maxRows int32) (err error) {
+	if debug { log.Println("> Execute") }
 	_, err = p.str.WriteByte('E')
 	if err != nil {
 		return err
@@ -429,10 +436,12 @@ func (p *ProtoStream) SendExecute(portal string, maxRows int32) (err error) {
 }
 
 func (p *ProtoStream) SendFlush() (err error) {
+	if debug { log.Println("> Flush") }
 	return p.sendEmpty('H')
 }
 
 func (p *ProtoStream) SendParse(statement, query string, paramTypes []oid.Oid) (err error) {
+	if debug { log.Println("> Parse") }
 	_, err = p.str.WriteByte('P')
 	if err != nil {
 		return err
@@ -464,6 +473,7 @@ func (p *ProtoStream) SendParse(statement, query string, paramTypes []oid.Oid) (
 }
 
 func (p *ProtoStream) SendPasswordMessage(password string) (err error) {
+	if debug { log.Println("> PasswordMessage") }
 	_, err = p.str.WriteByte('p')
 	if err != nil {
 		return err
@@ -477,6 +487,7 @@ func (p *ProtoStream) SendPasswordMessage(password string) (err error) {
 }
 
 func (p *ProtoStream) SendQuery(query string) (err error) {
+	if debug { log.Println("> Query") }
 	_, err = p.str.WriteByte('Q')
 	if err != nil {
 		return err
@@ -490,6 +501,7 @@ func (p *ProtoStream) SendQuery(query string) (err error) {
 }
 
 func (p *ProtoStream) SendSync() (err error) {
+	if debug { log.Println("> Sync") }
 	return p.sendEmpty('S')
 }
 
@@ -498,6 +510,8 @@ func (p *ProtoStream) Flush() error {
 }
 
 func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) {
+	if debug { log.Println("< AuthResponse") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -518,6 +532,8 @@ func (p *ProtoStream) ReceiveAuthResponse() (response *AuthResponse, err error) 
 }
 
 func (p *ProtoStream) ReceiveBackendKeyData() (keyData *BackendKeyData, err error) {
+	if debug { log.Println("< BackendKeyData") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -537,14 +553,20 @@ func (p *ProtoStream) ReceiveBackendKeyData() (keyData *BackendKeyData, err erro
 }
 
 func (p *ProtoStream) ReceiveBindComplete() (err error) {
+	if debug { log.Println("< BindComplete") }
+	p.hasNext = false
 	return p.receiveEmpty("BindComplete")
 }
 
 func (p *ProtoStream) ReceiveCloseComplete() (err error) {
+	if debug { log.Println("< CloseComplete") }
+	p.hasNext = false
 	return p.receiveEmpty("CloseComplete")
 }
 
 func (p *ProtoStream) ReceiveCommandComplete() (tag string, err error) {
+	if debug { log.Println("< CommandComplete") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return "", err
@@ -558,6 +580,8 @@ func (p *ProtoStream) ReceiveCommandComplete() (tag string, err error) {
 }
 
 func (p *ProtoStream) ReceiveCopyData() (data io.Reader, err error) {
+	if debug { log.Println("< ReceiveCopyData") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -566,18 +590,23 @@ func (p *ProtoStream) ReceiveCopyData() (data io.Reader, err error) {
 }
 
 func (p *ProtoStream) ReceiveCopyInResponse() (response *CopyResponse, err error) {
+	if debug { log.Println("< ReceiveCopyInResponse") }
+	p.hasNext = false
 	return p.receiveCopyResponse()
 }
 
 func (p *ProtoStream) ReceiveCopyOutResponse() (response *CopyResponse, err error) {
+	if debug { log.Println("< ReceiveCopyOutResponse") }
 	return p.receiveCopyResponse()
 }
 
 func (p *ProtoStream) ReceiveCopyBothResponse() (response *CopyResponse, err error) {
+	if debug { log.Println("< ReceiveCopyBothResponse") }
 	return p.receiveCopyResponse()
 }
 
 func (p *ProtoStream) receiveCopyResponse() (response *CopyResponse, err error) {
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -618,6 +647,8 @@ type Decode func(colNum int16, data *Stream, length int32) error
 // the size of the value. If the field in question is null, the
 // decodeFn will be called with the arguments (nil, -1).
 func (p *ProtoStream) ReceiveDataRow(decodeFn Decode) error {
+	if debug { log.Println("< DataRow") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return err
@@ -650,15 +681,20 @@ func (p *ProtoStream) ReceiveDataRow(decodeFn Decode) error {
 }
 
 func (p *ProtoStream) ReceiveEmptyQueryResponse() (err error) {
+	if debug { log.Println("< EmptyQueryResponse") }
 	return p.receiveEmpty("EmptyQueryResponse")
 }
 
 func (p *ProtoStream) ReceiveErrorResponse() (response map[ErrorField]string, err error) {
+	// FIXME: this will bogusly print both ErrorResponse and NoticeResponse
+	if debug { log.Println("< ErrorResponse") }
 	// literally the same thing
 	return p.ReceiveNoticeResponse()
 }
 
 func (p *ProtoStream) ReceiveNoticeResponse() (response map[ErrorField]string, err error) {
+	if debug { log.Println("< NoticeResponse") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -686,10 +722,13 @@ func (p *ProtoStream) ReceiveNoticeResponse() (response map[ErrorField]string, e
 }
 
 func (p *ProtoStream) ReceiveNoData() (err error) {
+	if debug { log.Println("< NoData") }
 	return p.receiveEmpty("NoData")
 }
 
 func (p *ProtoStream) ReceiveNotificationResponse() (notif *Notification, err error) {
+	if debug { log.Println("< NotificationResponse") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -718,6 +757,8 @@ func (p *ProtoStream) ReceiveNotificationResponse() (notif *Notification, err er
 }
 
 func (p *ProtoStream) ReceiveParameterDescription() (desc []oid.Oid, err error) {
+	if debug { log.Println("< ParameterDescription") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -746,6 +787,8 @@ func (p *ProtoStream) ReceiveParameterDescription() (desc []oid.Oid, err error) 
 }
 
 func (p *ProtoStream) ReceiveParameterStatus() (status *ParameterStatus, err error) {
+	if debug { log.Println("< ParameterStatus") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -770,14 +813,18 @@ func (p *ProtoStream) ReceiveParameterStatus() (status *ParameterStatus, err err
 }
 
 func (p *ProtoStream) ReceiveParseComplete() (err error) {
+	if debug { log.Println("< ParseComplete") }
 	return p.receiveEmpty("ParseComplete")
 }
 
 func (p *ProtoStream) ReceivePortalSuspended() (err error) {
+	if debug { log.Println("< PortalSuspended") }
 	return p.receiveEmpty("PortalSuspended")
 }
 
 func (p *ProtoStream) ReceiveReadyForQuery() (status TransactionStatus, err error) {
+	if debug { log.Println("< ReadyForQuery") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return 0x0, err
@@ -789,6 +836,8 @@ func (p *ProtoStream) ReceiveReadyForQuery() (status TransactionStatus, err erro
 }
 
 func (p *ProtoStream) ReceiveRowDescription() (descs []*FieldDescription, err error) {
+	if debug { log.Println("< RowDescription") }
+	p.hasNext = false
 	size, err := p.str.ReadInt32()
 	if err != nil {
 		return nil, err
@@ -857,6 +906,7 @@ func (p *ProtoStream) ReceiveSSLResponse() (ServerSSL, error) {
 
 func (p *ProtoStream) receiveEmpty(name string) error {
 	size, err := p.str.ReadInt32()
+	p.hasNext = false
 	if err != nil {
 		return err
 	} else if size != 4 {
